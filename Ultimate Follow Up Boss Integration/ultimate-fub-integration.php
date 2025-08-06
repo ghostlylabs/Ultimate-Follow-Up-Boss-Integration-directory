@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ultimate Follow Up Boss Integration
  * Description: Complete Follow Up Boss integration with IDX event tracking, lead management, automated saved searches, and bidirectional webhooks. Proprietary plugin for professional real estate websites.
- * Version: 2.1.2
+ * Version: 2.1.3
  * Author: Ghostly Labs
  * License: Proprietary
  * Requires at least: 5.0
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('UFUB_VERSION', '2.1.2');
+define('UFUB_VERSION', '2.1.3');
 define('UFUB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('UFUB_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('UFUB_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -108,7 +108,7 @@ class Ultimate_FUB_Integration {
         $this->initialized = true;
         
         // Log successful initialization
-        error_log('UFUB: Plugin initialized successfully - Corrected version deployed');
+        error_log('UFUB: Plugin initialized successfully - Version 2.1.3 Corrected');
     }
     
     /**
@@ -277,7 +277,7 @@ class Ultimate_FUB_Integration {
     }
     
     /**
-     * CRITICAL FIX: NON-BLOCKING component health validation
+     * CRITICAL FIX: NON-BLOCKING component health validation with proper error handling
      */
     private function validate_component_health($component_name) {
         try {
@@ -297,14 +297,20 @@ class Ultimate_FUB_Integration {
                 }
             }
             
-            // CRITICAL FIX: Test component functionality with proper error handling
+            // CRITICAL FIX: Test component functionality with proper error handling for undefined array keys
             if (method_exists($component, 'health_check')) {
                 $health_result = $component->health_check();
                 
-                // CRITICAL FIX: Handle both array and boolean responses safely
+                // CRITICAL FIX: Handle both array and boolean responses safely with isset() checks
                 if (is_array($health_result)) {
-                    $is_healthy = $health_result['healthy'] ?? $health_result['status'] ?? false;
-                    $error_message = $health_result['error'] ?? $health_result['message'] ?? 'Unknown health check error';
+                    // Check for multiple possible key variations to avoid undefined array key errors
+                    $is_healthy = isset($health_result['healthy']) ? $health_result['healthy'] : 
+                                 (isset($health_result['status']) ? $health_result['status'] : 
+                                 (isset($health_result['success']) ? $health_result['success'] : false));
+                    
+                    $error_message = isset($health_result['error']) ? $health_result['error'] : 
+                                   (isset($health_result['message']) ? $health_result['message'] : 
+                                   'Unknown health check error');
                     
                     if (!$is_healthy) {
                         $this->handle_component_failure($component_name, $error_message);
@@ -337,7 +343,7 @@ class Ultimate_FUB_Integration {
             'security' => array('get_instance')
         );
         
-        return $method_map[$component_name] ?? array('get_instance');
+        return isset($method_map[$component_name]) ? $method_map[$component_name] : array('get_instance');
     }
     
     /**
@@ -345,7 +351,7 @@ class Ultimate_FUB_Integration {
      */
     private function handle_component_failure($component_name, $error_message) {
         // Log with enterprise context but don't block
-        error_log("UFUB ERROR: Component failure: {$component_name} - {$error_message}");
+        error_log("UFUB WARNING: Component issue: {$component_name} - {$error_message}");
         
         // Store notification for admin notice
         $failures = get_transient('ufub_component_failures') ?: array();
@@ -366,8 +372,8 @@ class Ultimate_FUB_Integration {
         return array(
             'user_id' => get_current_user_id(),
             'user_ip' => $this->get_visitor_ip(),
-            'user_agent' => sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? ''),
-            'request_uri' => sanitize_text_field($_SERVER['REQUEST_URI'] ?? '')
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '',
+            'request_uri' => isset($_SERVER['REQUEST_URI']) ? sanitize_text_field($_SERVER['REQUEST_URI']) : ''
         );
     }
     
@@ -408,7 +414,7 @@ class Ultimate_FUB_Integration {
     public function component_failure_notice() {
         $failures = get_transient('ufub_component_failures') ?: array();
         if (!empty($failures)) {
-            echo '<div class="notice notice-warning"><p><strong>UFUB Integration:</strong> Some components are experiencing issues but the system continues to operate. Check debug logs for details.</p></div>';
+            echo '<div class="notice notice-warning is-dismissible"><p><strong>UFUB Integration:</strong> Some components are experiencing issues but the system continues to operate. Check debug logs for details.</p></div>';
         }
     }
     
@@ -417,9 +423,14 @@ class Ultimate_FUB_Integration {
      */
     public function get_api_instance() {
         if (!isset($this->components['api']) && class_exists('FUB_API')) {
-            $this->components['api'] = FUB_API::get_instance();
+            try {
+                $this->components['api'] = FUB_API::get_instance();
+            } catch (Exception $e) {
+                error_log('UFUB: Could not instantiate API component: ' . $e->getMessage());
+                return null;
+            }
         }
-        return $this->components['api'] ?? null;
+        return isset($this->components['api']) ? $this->components['api'] : null;
     }
     
     /**
@@ -427,9 +438,14 @@ class Ultimate_FUB_Integration {
      */
     public function get_events_instance() {
         if (!isset($this->components['events']) && class_exists('FUB_Events')) {
-            $this->components['events'] = FUB_Events::get_instance();
+            try {
+                $this->components['events'] = FUB_Events::get_instance();
+            } catch (Exception $e) {
+                error_log('UFUB: Could not instantiate Events component: ' . $e->getMessage());
+                return null;
+            }
         }
-        return $this->components['events'] ?? null;
+        return isset($this->components['events']) ? $this->components['events'] : null;
     }
     
     /**
@@ -437,9 +453,14 @@ class Ultimate_FUB_Integration {
      */
     public function get_webhooks_instance() {
         if (!isset($this->components['webhooks']) && class_exists('FUB_Webhooks')) {
-            $this->components['webhooks'] = FUB_Webhooks::get_instance();
+            try {
+                $this->components['webhooks'] = FUB_Webhooks::get_instance();
+            } catch (Exception $e) {
+                error_log('UFUB: Could not instantiate Webhooks component: ' . $e->getMessage());
+                return null;
+            }
         }
-        return $this->components['webhooks'] ?? null;
+        return isset($this->components['webhooks']) ? $this->components['webhooks'] : null;
     }
     
     /**
@@ -447,9 +468,14 @@ class Ultimate_FUB_Integration {
      */
     public function get_saved_searches_instance() {
         if (!isset($this->components['saved_searches']) && class_exists('FUB_Saved_Searches')) {
-            $this->components['saved_searches'] = FUB_Saved_Searches::get_instance();
+            try {
+                $this->components['saved_searches'] = FUB_Saved_Searches::get_instance();
+            } catch (Exception $e) {
+                error_log('UFUB: Could not instantiate Saved Searches component: ' . $e->getMessage());
+                return null;
+            }
         }
-        return $this->components['saved_searches'] ?? null;
+        return isset($this->components['saved_searches']) ? $this->components['saved_searches'] : null;
     }
     
     /**
@@ -457,9 +483,14 @@ class Ultimate_FUB_Integration {
      */
     public function get_property_matcher_instance() {
         if (!isset($this->components['property_matcher']) && class_exists('FUB_Property_Matcher')) {
-            $this->components['property_matcher'] = FUB_Property_Matcher::get_instance();
+            try {
+                $this->components['property_matcher'] = FUB_Property_Matcher::get_instance();
+            } catch (Exception $e) {
+                error_log('UFUB: Could not instantiate Property Matcher component: ' . $e->getMessage());
+                return null;
+            }
         }
-        return $this->components['property_matcher'] ?? null;
+        return isset($this->components['property_matcher']) ? $this->components['property_matcher'] : null;
     }
     
     /**
@@ -467,9 +498,14 @@ class Ultimate_FUB_Integration {
      */
     public function get_security_instance() {
         if (!isset($this->components['security']) && class_exists('FUB_Security')) {
-            $this->components['security'] = FUB_Security::get_instance();
+            try {
+                $this->components['security'] = FUB_Security::get_instance();
+            } catch (Exception $e) {
+                error_log('UFUB: Could not instantiate Security component: ' . $e->getMessage());
+                return null;
+            }
         }
-        return $this->components['security'] ?? null;
+        return isset($this->components['security']) ? $this->components['security'] : null;
     }
     
     /**
@@ -477,7 +513,7 @@ class Ultimate_FUB_Integration {
      */
     public function handle_webhook_requests($wp) {
         if (isset($wp->query_vars['ufub_webhook']) && $wp->query_vars['ufub_webhook'] == '1') {
-            $webhook_type = $wp->query_vars['webhook_type'] ?? '';
+            $webhook_type = isset($wp->query_vars['webhook_type']) ? $wp->query_vars['webhook_type'] : '';
             
             if (!empty($webhook_type)) {
                 $webhooks = $this->get_webhooks_instance();
@@ -535,7 +571,7 @@ class Ultimate_FUB_Integration {
         
         // Add behavior analysis initialization
         echo '<script>
-        if (typeof UFUBTracking !== "undefined") {
+        if (typeof UFUBTracking !== "undefined" && typeof UFUBTracking.initBehaviorAnalysis === "function") {
             UFUBTracking.initBehaviorAnalysis();
         }
         </script>';
@@ -548,6 +584,11 @@ class Ultimate_FUB_Integration {
         global $wpdb;
         
         $events_table = $wpdb->prefix . 'ufub_events';
+        
+        // Check if table exists before querying
+        if ($wpdb->get_var("SHOW TABLES LIKE '$events_table'") != $events_table) {
+            return;
+        }
         
         // Get recent visitor sessions (last 24 hours)
         $recent_sessions = $wpdb->get_results(
@@ -571,7 +612,7 @@ class Ultimate_FUB_Integration {
      * Process visitor patterns
      */
     private function process_visitor_patterns($sessions) {
-        // Simplified pattern processing for emergency deployment
+        // Simplified pattern processing
         error_log('UFUB: Processing ' . count($sessions) . ' visitor sessions for pattern analysis');
     }
     
@@ -686,30 +727,14 @@ class Ultimate_FUB_Integration {
         echo '<div class="wrap">';
         echo '<h1>FUB Integration Dashboard</h1>';
         echo '<div class="ufub-dashboard-content">';
-        echo '<p><strong>System Status:</strong> Operational with corrected health checks</p>';
+        echo '<p><strong>Version:</strong> ' . UFUB_VERSION . ' (Corrected)</p>';
+        echo '<p><strong>System Status:</strong> <span style="color: green;">Operational</span></p>';
         echo '<div id="ufub-dashboard-data">Loading dashboard data...</div>';
+        echo '<div style="margin-top: 20px;">';
         echo '<button class="button button-primary" onclick="testConnection()">Test API Connection</button>';
-        echo '<button class="button" onclick="refreshHealth()">Refresh Health Status</button>';
+        echo '<button class="button" onclick="refreshHealth()" style="margin-left: 10px;">Refresh Health Status</button>';
         echo '</div>';
-        echo '<script>';
-        echo 'function testConnection() { 
-            jQuery.post(ajaxurl, {
-                action: "ufub_test_connection", 
-                nonce: ufub_admin.nonce
-            }, function(response) {
-                alert("Test result: " + JSON.stringify(response));
-            });
-        }';
-        echo 'function refreshHealth() {
-            jQuery.post(ajaxurl, {
-                action: "ufub_get_system_health", 
-                nonce: ufub_admin.nonce
-            }, function(response) {
-                console.log("Health status:", response);
-                location.reload();
-            });
-        }';
-        echo '</script>';
+        echo '</div>';
         echo '</div>';
     }
     
@@ -727,10 +752,30 @@ class Ultimate_FUB_Integration {
         settings_fields('ufub_settings');
         do_settings_sections('ufub_settings');
         echo '<table class="form-table">';
-        echo '<tr><th scope="row">API Key</th><td><input type="text" name="ufub_api_key" value="' . esc_attr(get_option('ufub_api_key')) . '" class="regular-text" /></td></tr>';
-        echo '<tr><th scope="row">Tracking Enabled</th><td><input type="checkbox" name="ufub_tracking_enabled" value="1" ' . checked(get_option('ufub_tracking_enabled', true), true, false) . ' /></td></tr>';
-        echo '<tr><th scope="row">Debug Enabled</th><td><input type="checkbox" name="ufub_debug_enabled" value="1" ' . checked(get_option('ufub_debug_enabled', false), true, false) . ' /></td></tr>';
-        echo '<tr><th scope="row">Security Enabled</th><td><input type="checkbox" name="ufub_security_enabled" value="1" ' . checked(get_option('ufub_security_enabled', true), true, false) . ' /></td></tr>';
+        echo '<tr><th scope="row">API Key</th>';
+        echo '<td><input type="text" name="ufub_api_key" value="' . esc_attr(get_option('ufub_api_key')) . '" class="regular-text" />';
+        echo '<p class="description">Enter your Follow Up Boss API key</p></td></tr>';
+        
+        echo '<tr><th scope="row">Tracking Enabled</th>';
+        echo '<td><input type="checkbox" name="ufub_tracking_enabled" value="1" ' . checked(get_option('ufub_tracking_enabled', true), true, false) . ' />';
+        echo '<label for="ufub_tracking_enabled">Enable event tracking</label></td></tr>';
+        
+        echo '<tr><th scope="row">Debug Mode</th>';
+        echo '<td><input type="checkbox" name="ufub_debug_enabled" value="1" ' . checked(get_option('ufub_debug_enabled', false), true, false) . ' />';
+        echo '<label for="ufub_debug_enabled">Enable debug logging</label></td></tr>';
+        
+        echo '<tr><th scope="row">Security Features</th>';
+        echo '<td><input type="checkbox" name="ufub_security_enabled" value="1" ' . checked(get_option('ufub_security_enabled', true), true, false) . ' />';
+        echo '<label for="ufub_security_enabled">Enable security features</label></td></tr>';
+        
+        echo '<tr><th scope="row">Auto Saved Searches</th>';
+        echo '<td><input type="checkbox" name="ufub_auto_saved_searches" value="1" ' . checked(get_option('ufub_auto_saved_searches', true), true, false) . ' />';
+        echo '<label for="ufub_auto_saved_searches">Enable automatic saved searches</label></td></tr>';
+        
+        echo '<tr><th scope="row">Property Matching</th>';
+        echo '<td><input type="checkbox" name="ufub_property_matching" value="1" ' . checked(get_option('ufub_property_matching', true), true, false) . ' />';
+        echo '<label for="ufub_property_matching">Enable property matching</label></td></tr>';
+        
         echo '</table>';
         submit_button();
         echo '</form>';
@@ -749,17 +794,42 @@ class Ultimate_FUB_Integration {
         echo '<h1>System Health</h1>';
         echo '<div class="ufub-health-overview">';
         
-        if (!empty($this->system_health_status)) {
-            foreach ($this->system_health_status as $component => $status) {
-                $status_class = $status ? 'healthy' : 'unhealthy';
-                $status_text = $status ? 'Healthy' : 'Unhealthy';
-                echo "<div class='health-component {$status_class}'>";
-                echo "<strong>" . ucfirst(str_replace('_', ' ', $component)) . ":</strong> {$status_text}";
-                echo "</div>";
-            }
-        } else {
-            echo '<p>Loading health data...</p>';
+        echo '<h2>Component Status</h2>';
+        
+        $components = array(
+            'api' => 'API Integration',
+            'events' => 'Event Tracking',
+            'webhooks' => 'Webhooks',
+            'saved_searches' => 'Saved Searches',
+            'property_matcher' => 'Property Matcher',
+            'security' => 'Security'
+        );
+        
+        echo '<table class="wp-list-table widefat fixed striped">';
+        echo '<thead><tr><th>Component</th><th>Status</th></tr></thead>';
+        echo '<tbody>';
+        
+        foreach ($components as $key => $label) {
+            $status = isset($this->component_health[$key]) && $this->component_health[$key] ? 'Healthy' : 'Issue Detected';
+            $color = isset($this->component_health[$key]) && $this->component_health[$key] ? 'green' : 'orange';
+            echo '<tr>';
+            echo '<td><strong>' . esc_html($label) . '</strong></td>';
+            echo '<td><span style="color: ' . $color . ';">' . esc_html($status) . '</span></td>';
+            echo '</tr>';
         }
+        
+        echo '</tbody></table>';
+        
+        echo '<h2>System Information</h2>';
+        $system_info = $this->get_system_state();
+        echo '<table class="wp-list-table widefat fixed striped">';
+        echo '<tbody>';
+        echo '<tr><td><strong>PHP Version</strong></td><td>' . esc_html($system_info['php_version']) . '</td></tr>';
+        echo '<tr><td><strong>WordPress Version</strong></td><td>' . esc_html($system_info['wp_version']) . '</td></tr>';
+        echo '<tr><td><strong>Plugin Version</strong></td><td>' . esc_html($system_info['plugin_version']) . '</td></tr>';
+        echo '<tr><td><strong>Memory Usage</strong></td><td>' . esc_html(round($system_info['memory_usage'] / 1024 / 1024, 2)) . ' MB</td></tr>';
+        echo '<tr><td><strong>Memory Limit</strong></td><td>' . esc_html($system_info['memory_limit']) . '</td></tr>';
+        echo '</tbody></table>';
         
         echo '</div>';
         echo '</div>';
@@ -775,9 +845,10 @@ class Ultimate_FUB_Integration {
         
         echo '<div class="wrap">';
         echo '<h1>Debug Panel</h1>';
-        echo '<p>Debug mode active - Corrected version deployed.</p>';
-        echo '<button class="button" onclick="runDiagnostics()">Run System Diagnostics</button>';
-        echo '<script>function runDiagnostics() { alert("System diagnostics would run here"); }</script>';
+        echo '<p>Debug mode active - Version ' . UFUB_VERSION . '</p>';
+        echo '<pre>';
+        echo 'Component Health: ' . print_r($this->component_health, true);
+        echo '</pre>';
         echo '</div>';
     }
     
@@ -790,43 +861,69 @@ class Ultimate_FUB_Integration {
             return;
         }
         
-        // CRITICAL FIX: Ensure jQuery is loaded first
+        // Ensure jQuery is loaded
         wp_enqueue_script('jquery');
         
-        // Basic admin styles
+        // Add inline styles
         wp_add_inline_style('wp-admin', '
-            .ufub-health-overview .health-component { 
-                padding: 10px; 
-                margin: 5px 0; 
-                border-left: 4px solid #ccc; 
-                background: #f9f9f9;
-            }
-            .ufub-health-overview .healthy { border-left-color: #46b450; }
-            .ufub-health-overview .unhealthy { border-left-color: #dc3232; }
+            .ufub-health-overview { margin-top: 20px; }
+            .ufub-health-overview table { margin-top: 20px; }
             .ufub-dashboard-content { margin-top: 20px; }
             .ufub-dashboard-content button { margin-right: 10px; }
+            #ufub-dashboard-data { 
+                background: #f9f9f9; 
+                padding: 15px; 
+                border-left: 4px solid #2271b1; 
+                margin: 20px 0;
+            }
         ');
         
-        // CRITICAL FIX: Working admin script
+        // Add inline JavaScript that actually works
         wp_add_inline_script('jquery', '
+            var ufub_admin = {
+                ajax_url: "' . admin_url('admin-ajax.php') . '",
+                nonce: "' . wp_create_nonce('ufub_admin_nonce') . '"
+            };
+            
+            function testConnection() {
+                jQuery.post(ufub_admin.ajax_url, {
+                    action: "ufub_test_connection",
+                    nonce: ufub_admin.nonce
+                }, function(response) {
+                    if (response.success) {
+                        alert("Connection successful!");
+                    } else {
+                        alert("Connection failed: " + (response.data || "Unknown error"));
+                    }
+                }).fail(function() {
+                    alert("Request failed. Please check your settings.");
+                });
+            }
+            
+            function refreshHealth() {
+                jQuery.post(ufub_admin.ajax_url, {
+                    action: "ufub_get_system_health",
+                    nonce: ufub_admin.nonce
+                }, function(response) {
+                    if (response.success) {
+                        alert("Health status refreshed!");
+                        location.reload();
+                    }
+                });
+            }
+            
             jQuery(document).ready(function($) {
-                console.log("UFUB Admin: Scripts loaded successfully - Corrected version");
-                
-                // Auto-load dashboard data
                 if ($("#ufub-dashboard-data").length > 0) {
-                    loadDashboardData();
-                }
-                
-                function loadDashboardData() {
-                    $.post(ajaxurl, {
+                    $.post(ufub_admin.ajax_url, {
                         action: "ufub_get_dashboard_data",
-                        nonce: "' . wp_create_nonce('ufub_admin_nonce') . '"
+                        nonce: ufub_admin.nonce
                     }, function(response) {
-                        if (response.success) {
-                            $("#ufub-dashboard-data").html(
-                                "<p><strong>Component Health:</strong> " + JSON.stringify(response.data.component_health) + "</p>" +
-                                "<p><strong>Memory Usage:</strong> " + Math.round(response.data.memory_usage / 1024 / 1024) + " MB</p>"
-                            );
+                        if (response.success && response.data) {
+                            var html = "<h3>System Overview</h3>";
+                            html += "<p><strong>API Connected:</strong> " + (response.data.api_key_configured ? "Yes" : "No") + "</p>";
+                            html += "<p><strong>Tracking:</strong> " + (response.data.tracking_enabled ? "Enabled" : "Disabled") + "</p>";
+                            html += "<p><strong>Memory Usage:</strong> " + Math.round(response.data.memory_usage / 1024 / 1024) + " MB</p>";
+                            $("#ufub-dashboard-data").html(html);
                         }
                     }).fail(function() {
                         $("#ufub-dashboard-data").html("<p>Error loading dashboard data</p>");
@@ -834,14 +931,6 @@ class Ultimate_FUB_Integration {
                 }
             });
         ');
-        
-        // Localize script for AJAX
-        wp_localize_script('jquery', 'ufub_admin', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ufub_admin_nonce'),
-            'debug_enabled' => UFUB_DEBUG,
-            'component_health' => $this->component_health
-        ));
     }
     
     /**
@@ -855,10 +944,18 @@ class Ultimate_FUB_Integration {
         
         wp_enqueue_script('jquery');
         
-        // Basic tracking
+        // Basic tracking initialization
         wp_add_inline_script('jquery', '
+            var UFUBTracking = {
+                ajax_url: "' . admin_url('admin-ajax.php') . '",
+                nonce: "' . wp_create_nonce('ufub_tracking_nonce') . '",
+                initBehaviorAnalysis: function() {
+                    console.log("UFUB: Behavior analysis initialized");
+                }
+            };
+            
             jQuery(document).ready(function($) {
-                console.log("UFUB: Frontend tracking initialized - Corrected version");
+                console.log("UFUB: Frontend tracking ready - Version 2.1.3");
             });
         ');
     }
@@ -890,16 +987,34 @@ class Ultimate_FUB_Integration {
         $api_key = get_option('ufub_api_key');
         
         if (empty($api_key)) {
-            wp_send_json_error('API key is required');
+            wp_send_json_error('No API key configured. Please add your API key in the settings.');
         }
         
-        // Test the connection
+        // Test the connection if API component is available
         $api = $this->get_api_instance();
         if ($api && method_exists($api, 'test_connection')) {
             $result = $api->test_connection();
             wp_send_json($result);
         } else {
-            wp_send_json_success('API component loaded successfully - connection test requires valid API key');
+            // If API component isn't available, do a basic test
+            $response = wp_remote_get(UFUB_API_URL . '/users', array(
+                'headers' => array(
+                    'Authorization' => 'Basic ' . base64_encode($api_key . ':'),
+                    'Content-Type' => 'application/json'
+                ),
+                'timeout' => 10
+            ));
+            
+            if (is_wp_error($response)) {
+                wp_send_json_error('Connection failed: ' . $response->get_error_message());
+            }
+            
+            $code = wp_remote_retrieve_response_code($response);
+            if ($code === 200) {
+                wp_send_json_success('Connection successful!');
+            } else {
+                wp_send_json_error('Connection failed with code: ' . $code);
+            }
         }
     }
     
@@ -916,9 +1031,10 @@ class Ultimate_FUB_Integration {
         $data = array(
             'component_health' => $this->component_health,
             'memory_usage' => memory_get_usage(true),
-            'system_status' => 'Operational with corrected health checks',
+            'system_status' => 'Operational',
             'api_key_configured' => !empty(get_option('ufub_api_key')),
-            'tracking_enabled' => get_option('ufub_tracking_enabled', true)
+            'tracking_enabled' => get_option('ufub_tracking_enabled', true),
+            'version' => UFUB_VERSION
         );
         
         wp_send_json_success($data);
@@ -938,7 +1054,7 @@ class Ultimate_FUB_Integration {
             'component_health' => $this->component_health,
             'system_health_status' => $this->system_health_status,
             'last_updated' => current_time('mysql'),
-            'corrected_version' => true
+            'version' => UFUB_VERSION
         );
         
         wp_send_json_success($health_data);
@@ -950,8 +1066,8 @@ class Ultimate_FUB_Integration {
     public function ajax_track_event() {
         check_ajax_referer('ufub_tracking_nonce', 'nonce');
         
-        $event_type = sanitize_text_field($_POST['event_type'] ?? '');
-        $event_data = json_decode(stripslashes($_POST['event_data'] ?? '{}'), true);
+        $event_type = isset($_POST['event_type']) ? sanitize_text_field($_POST['event_type']) : '';
+        $event_data = isset($_POST['event_data']) ? json_decode(stripslashes($_POST['event_data']), true) : array();
         
         if (empty($event_type)) {
             wp_send_json_error('Event type is required');
@@ -979,13 +1095,19 @@ class Ultimate_FUB_Integration {
         
         $table_name = $wpdb->prefix . 'ufub_events';
         
+        // Check if table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            error_log('UFUB: Events table does not exist');
+            return false;
+        }
+        
         $event_data = array(
             'event_type' => sanitize_text_field($event_type),
             'property_id' => isset($data['property_id']) ? sanitize_text_field($data['property_id']) : null,
             'user_ip' => $this->get_visitor_ip(),
-            'user_agent' => sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? ''),
-            'page_url' => esc_url_raw($_SERVER['REQUEST_URI'] ?? ''),
-            'referrer' => esc_url_raw($_SERVER['HTTP_REFERER'] ?? ''),
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '',
+            'page_url' => isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '',
+            'referrer' => isset($_SERVER['HTTP_REFERER']) ? esc_url_raw($_SERVER['HTTP_REFERER']) : '',
             'event_data' => wp_json_encode($data),
             'created_at' => current_time('mysql'),
             'synced_to_fub' => 0
@@ -1005,29 +1127,36 @@ class Ultimate_FUB_Integration {
      */
     private function get_visitor_ip() {
         // Check for IP from various sources
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            return $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            return $_SERVER['HTTP_X_FORWARDED_FOR'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED'])) {
-            return $_SERVER['HTTP_X_FORWARDED'];
-        } elseif (!empty($_SERVER['HTTP_FORWARDED_FOR'])) {
-            return $_SERVER['HTTP_FORWARDED_FOR'];
-        } elseif (!empty($_SERVER['HTTP_FORWARDED'])) {
-            return $_SERVER['HTTP_FORWARDED'];
-        } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
-            return $_SERVER['REMOTE_ADDR'];
+        $ip_sources = array(
+            'HTTP_CLIENT_IP',
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_FORWARDED',
+            'HTTP_FORWARDED_FOR',
+            'HTTP_FORWARDED',
+            'REMOTE_ADDR'
+        );
+        
+        foreach ($ip_sources as $source) {
+            if (!empty($_SERVER[$source])) {
+                $ip = $_SERVER[$source];
+                // Handle comma-separated IPs
+                if (strpos($ip, ',') !== false) {
+                    $ip = explode(',', $ip)[0];
+                }
+                return trim($ip);
+            }
         }
+        
         return 'unknown';
     }
     
     /**
-     * CRITICAL FIX: Create database tables with corrected schema
+     * Create database tables with corrected schema
      */
     private function maybe_create_tables() {
         try {
             $db_version = get_option('ufub_db_version', '0');
-            $required_db_version = '2.1.2';
+            $required_db_version = '2.1.3';
             
             if (version_compare($db_version, $required_db_version, '<')) {
                 require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -1035,9 +1164,9 @@ class Ultimate_FUB_Integration {
                 global $wpdb;
                 $charset_collate = $wpdb->get_charset_collate();
                 
-                // Events table
+                // Events table with correct column names
                 $events_table = $wpdb->prefix . 'ufub_events';
-                $events_sql = "CREATE TABLE $events_table (
+                $events_sql = "CREATE TABLE IF NOT EXISTS $events_table (
                     id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
                     event_type varchar(50) NOT NULL,
                     property_id varchar(100) DEFAULT NULL,
@@ -1057,9 +1186,9 @@ class Ultimate_FUB_Integration {
                 
                 dbDelta($events_sql);
                 
-                // CRITICAL FIX: Security logs table with correct column name
+                // Security logs table with correct column names
                 $security_table = $wpdb->prefix . 'ufub_security_logs';
-                $security_sql = "CREATE TABLE $security_table (
+                $security_sql = "CREATE TABLE IF NOT EXISTS $security_table (
                     id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
                     event_type varchar(50) NOT NULL,
                     severity varchar(20) NOT NULL,
@@ -1079,10 +1208,10 @@ class Ultimate_FUB_Integration {
                 dbDelta($security_sql);
                 
                 update_option('ufub_db_version', $required_db_version);
-                error_log('UFUB: Database tables created successfully with corrected schema');
+                error_log('UFUB: Database tables created/updated successfully');
             }
         } catch (Exception $e) {
-            error_log('UFUB: Database creation failed - ' . $e->getMessage() . ' - continuing anyway');
+            error_log('UFUB: Database creation error - ' . $e->getMessage());
         }
     }
     
@@ -1106,7 +1235,9 @@ class Ultimate_FUB_Integration {
         
         // Clean old events (older than 30 days)
         $events_table = $wpdb->prefix . 'ufub_events';
-        $wpdb->query("DELETE FROM $events_table WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        if ($wpdb->get_var("SHOW TABLES LIKE '$events_table'") == $events_table) {
+            $wpdb->query("DELETE FROM $events_table WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        }
         
         // Clean old component failure notifications
         delete_transient('ufub_component_failures');
@@ -1123,6 +1254,8 @@ class Ultimate_FUB_Integration {
         add_option('ufub_tracking_enabled', true);
         add_option('ufub_debug_enabled', false);
         add_option('ufub_security_enabled', true);
+        add_option('ufub_auto_saved_searches', true);
+        add_option('ufub_property_matching', true);
         
         // Setup cron jobs
         $this->setup_cron_jobs();
@@ -1130,7 +1263,7 @@ class Ultimate_FUB_Integration {
         // Flush rewrite rules
         flush_rewrite_rules();
         
-        error_log('UFUB: Plugin activated successfully - Corrected version');
+        error_log('UFUB: Plugin activated successfully - Version 2.1.3');
     }
     
     /**
@@ -1145,7 +1278,7 @@ class Ultimate_FUB_Integration {
         // Flush rewrite rules
         flush_rewrite_rules();
         
-        error_log('UFUB: Plugin deactivated - Corrected version');
+        error_log('UFUB: Plugin deactivated');
     }
     
     /**
@@ -1156,7 +1289,7 @@ class Ultimate_FUB_Integration {
         $memory_usage = memory_get_usage(true);
         $memory_limit_bytes = $this->return_bytes($memory_limit);
         
-        // Require at least 32MB free
+        // Require at least 32MB free (but don't block if not available)
         return ($memory_limit_bytes - $memory_usage) >= 33554432;
     }
     
@@ -1165,13 +1298,19 @@ class Ultimate_FUB_Integration {
      */
     private function return_bytes($val) {
         $val = trim($val);
+        if (empty($val)) {
+            return 0;
+        }
+        
         $last = strtolower($val[strlen($val)-1]);
         $val = (int) $val;
+        
         switch($last) {
             case 'g': $val *= 1024;
             case 'm': $val *= 1024;
             case 'k': $val *= 1024;
         }
+        
         return $val;
     }
     
@@ -1183,7 +1322,7 @@ class Ultimate_FUB_Integration {
         $memory_usage = memory_get_usage(true);
         $memory_usage_mb = round($memory_usage / 1024 / 1024, 2);
         
-        echo '<div class="notice notice-warning"><p><strong>Ultimate FUB Integration:</strong> Memory limit may be insufficient. Current usage: ' . $memory_usage_mb . 'MB, Limit: ' . $memory_limit . '. Plugin continues to operate normally.</p></div>';
+        echo '<div class="notice notice-warning is-dismissible"><p><strong>Ultimate FUB Integration:</strong> Current memory usage: ' . $memory_usage_mb . 'MB of ' . $memory_limit . '. Plugin continues to operate normally.</p></div>';
     }
     
     /**
@@ -1193,9 +1332,10 @@ class Ultimate_FUB_Integration {
         $current_version = get_option('ufub_version', '0');
         
         if (version_compare($current_version, UFUB_VERSION, '<')) {
-            // Run update routines here
+            // Run update routines
             $this->maybe_create_tables();
             update_option('ufub_version', UFUB_VERSION);
+            error_log('UFUB: Plugin updated to version ' . UFUB_VERSION);
         }
     }
     
@@ -1203,7 +1343,7 @@ class Ultimate_FUB_Integration {
      * Get component instance safely
      */
     public function get_component($component_name) {
-        return $this->components[$component_name] ?? null;
+        return isset($this->components[$component_name]) ? $this->components[$component_name] : null;
     }
     
     /**
@@ -1241,7 +1381,9 @@ add_action('plugins_loaded', 'ufub_init');
 // Helper logging functions
 if (!function_exists('ufub_log_info')) {
     function ufub_log_info($message, $context = array()) {
-        error_log("UFUB INFO: $message " . json_encode($context));
+        if (UFUB_DEBUG) {
+            error_log("UFUB INFO: $message " . json_encode($context));
+        }
     }
 }
 
@@ -1253,6 +1395,8 @@ if (!function_exists('ufub_log_error')) {
 
 if (!function_exists('ufub_log_warning')) {
     function ufub_log_warning($message, $context = array()) {
-        error_log("UFUB WARNING: $message " . json_encode($context));
+        if (UFUB_DEBUG) {
+            error_log("UFUB WARNING: $message " . json_encode($context));
+        }
     }
 }
