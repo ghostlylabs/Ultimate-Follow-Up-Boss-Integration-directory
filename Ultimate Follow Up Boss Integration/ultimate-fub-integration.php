@@ -62,10 +62,17 @@ class Ultimate_FUB_Integration {
             return;
         }
         
-        // Check memory before proceeding
+        // Check memory before proceeding - NON-BLOCKING
         if (!$this->check_memory_requirements()) {
+            // Log warning but continue initialization
             add_action('admin_notices', array($this, 'memory_notice'));
-            return;
+            if (function_exists('ufub_log_warning')) {
+                ufub_log_warning('Memory requirements not met but continuing initialization', array(
+                    'memory_limit' => ini_get('memory_limit'),
+                    'memory_usage' => memory_get_usage(true)
+                ));
+            }
+            // CONTINUE INITIALIZATION INSTEAD OF RETURNING
         }
         
         // Initialize plugin
@@ -214,127 +221,103 @@ class Ultimate_FUB_Integration {
     }
     
     /**
-     * EMERGENCY RECOVERY: Component initialization - HEALTH CHECK BYPASSED
+     * Initialize plugin components with health validation
+     * ENHANCED: Component Health Validation System
      */
     private function init_components() {
         $this->component_health = array();
         
-        // Component initialization order (dependencies first)
-        $component_order = array(
-            'api' => 'get_api_instance',
-            'events' => 'get_events_instance', 
-            'webhooks' => 'get_webhooks_instance',
-            'saved_searches' => 'get_saved_searches_instance',
-            'property_matcher' => 'get_property_matcher_instance'
-        );
+        // Initialize API with health check
+        $this->components['api'] = $this->get_api_instance();
+        $this->component_health['api'] = $this->validate_component_health('api');
         
-        // Initialize security component only if enabled
+        // Initialize Events with health check
+        $this->components['events'] = $this->get_events_instance();
+        $this->component_health['events'] = $this->validate_component_health('events');
+        
+        // Initialize Webhooks with health check
+        $this->components['webhooks'] = $this->get_webhooks_instance();
+        $this->component_health['webhooks'] = $this->validate_component_health('webhooks');
+        
+        // Initialize Saved Searches with health check
+        $this->components['saved_searches'] = $this->get_saved_searches_instance();
+        $this->component_health['saved_searches'] = $this->validate_component_health('saved_searches');
+        
+        // Initialize Property Matcher with health check
+        $this->components['property_matcher'] = $this->get_property_matcher_instance();
+        $this->component_health['property_matcher'] = $this->validate_component_health('property_matcher');
+        
+        // Initialize Security (only if enabled) with health check
         if (get_option('ufub_security_enabled', true)) {
-            $component_order['security'] = 'get_security_instance';
+            $this->components['security'] = $this->get_security_instance();
+            $this->component_health['security'] = $this->validate_component_health('security');
         }
         
-        // Initialize components in order - NO HEALTH CHECK BLOCKING
-        foreach ($component_order as $component_name => $getter_method) {
-            try {
-                // Initialize component
-                $this->components[$component_name] = $this->$getter_method();
-                
-                // EMERGENCY RECOVERY: Skip health validation - always mark as healthy
-                $this->component_health[$component_name] = true;
-                
-                // Log initialization result
-                ufub_log_info("Component initialization (recovery mode): {$component_name} - SUCCESS");
-                
-            } catch (Exception $e) {
-                // Handle initialization exception but don't block system
-                $this->component_health[$component_name] = false;
-                ufub_log_warning("Component initialization exception (non-blocking): {$component_name}", array(
-                    'error' => $e->getMessage(),
-                    'recovery_mode' => true
-                ));
-                
-                // Continue with system initialization despite component failure
-            }
+        // Log component health - NON-BLOCKING
+        ufub_log_info('Component initialization health check', $this->component_health);
+        
+        // Handle critical component failures - WARNING ONLY, DON'T DISABLE
+        if (!$this->component_health['api'] && get_option('ufub_api_key')) {
+            add_action('admin_notices', array($this, 'component_failure_notice'));
+            ufub_log_warning('API component unhealthy but continuing operation', array(
+                'api_key_present' => !empty(get_option('ufub_api_key')),
+                'component_health' => $this->component_health
+            ));
         }
-        
-        // Log overall component health
-        $healthy_count = array_sum($this->component_health);
-        $total_count = count($this->component_health);
-        
-        ufub_log_info("Component initialization complete (recovery mode)", array(
-            'healthy_components' => $healthy_count,
-            'total_components' => $total_count,
-            'health_percentage' => round(($healthy_count / $total_count) * 100, 2),
-            'component_status' => $this->component_health,
-            'recovery_mode' => true
-        ));
         
         // Update system health status
         $this->update_system_health_status();
-        
-        // EMERGENCY RECOVERY: No safe mode activation - system always continues
-        ufub_log_info('System recovery mode active - all components allowed to operate');
     }
     
     /**
-     * EMERGENCY RECOVERY: Component health validation - BYPASSED FOR SYSTEM RECOVERY
+     * ARCHITECTURAL REQUIREMENT: Enterprise component health validation
+     * ENHANCED: Non-blocking with graceful degradation
      */
     private function validate_component_health($component_name) {
         try {
             $component = $this->components[$component_name] ?? null;
             
             if (!$component) {
-                // Component not found - log but don't fail
-                ufub_log_warning("Component not initialized: {$component_name}", array(
-                    'component' => $component_name,
-                    'available_components' => array_keys($this->components)
-                ));
-                return true; // Allow system to continue
+                $this->handle_component_failure($component_name, 'Component not initialized');
+                return false; // Component health = false, but don't block initialization
             }
             
-            // EMERGENCY BYPASS: Skip method validation - let components work
-            // Components will handle their own method availability internally
-            
-            // EMERGENCY BYPASS: Skip health check execution - non-blocking monitoring only
-            if (method_exists($component, 'health_check')) {
-                try {
-                    $health_result = $component->health_check();
-                    // Log health status for monitoring but don't block initialization
-                    ufub_log_info("Component health check (non-blocking): {$component_name}", array(
-                        'result' => $health_result,
-                        'component' => $component_name
-                    ));
-                } catch (Exception $e) {
-                    // Health check failed but don't block component usage
-                    ufub_log_warning("Component health check error (non-blocking): {$component_name}", array(
-                        'error' => $e->getMessage(),
-                        'component' => $component_name
-                    ));
+            // Check if component has required methods
+            $required_methods = $this->get_required_methods($component_name);
+            foreach ($required_methods as $method) {
+                if (!method_exists($component, $method)) {
+                    $this->handle_component_failure($component_name, "Missing required method: {$method}");
+                    return false; // Component health = false, but don't block initialization
                 }
             }
             
-            // ALWAYS RETURN TRUE - Let components operate regardless of health status
-            return true;
+            // ARCHITECTURAL ADDITION: Test component functionality
+            if (method_exists($component, 'health_check')) {
+                $health_result = $component->health_check();
+                if (is_array($health_result)) {
+                    if (!$health_result['healthy']) {
+                        $this->handle_component_failure($component_name, $health_result['error']);
+                        return false; // Component health = false, but don't block initialization
+                    }
+                } elseif (!$health_result) {
+                    $this->handle_component_failure($component_name, 'Health check returned false');
+                    return false; // Component health = false, but don't block initialization
+                }
+            }
+            
+            return true; // Component healthy
             
         } catch (Exception $e) {
-            // Log exception but don't block system
-            ufub_log_warning("Component validation exception (non-blocking): {$component_name}", array(
-                'error' => $e->getMessage(),
-                'component' => $component_name
-            ));
-            return true; // Allow system to continue
+            $this->handle_component_failure($component_name, $e->getMessage());
+            return false; // Component health = false, but don't block initialization
         }
     }
     
     /**
-     * EMERGENCY RECOVERY: Component method validation - BYPASSED FOR SYSTEM RECOVERY
+     * Get required methods for component validation
      */
     private function get_required_methods($component_name) {
-        // EMERGENCY BYPASS: Return empty array - no methods are required for initialization
-        // Components will handle their own method availability internally
-        
-        // Log what would normally be required for monitoring purposes
-        $would_be_required = array(
+        $method_map = array(
             'api' => array('get_instance', 'test_connection'),
             'events' => array('get_instance', 'track_event'),
             'webhooks' => array('get_instance', 'handle_webhook'),
@@ -343,127 +326,26 @@ class Ultimate_FUB_Integration {
             'security' => array('get_instance', 'validate_request')
         );
         
-        if (isset($would_be_required[$component_name])) {
-            ufub_log_info("Component method requirements (bypassed): {$component_name}", array(
-                'would_require' => $would_be_required[$component_name],
-                'status' => 'bypassed_for_recovery'
-            ));
-        }
-        
-        // Return empty - no methods required for component initialization
-        return array();
+        return $method_map[$component_name] ?? array('get_instance');
     }
     
     /**
-     * EMERGENCY FIX: Enterprise error handling - ENHANCED
+     * ARCHITECTURAL REQUIREMENT: Enterprise error handling
      */
     private function handle_component_failure($component_name, $error_message) {
-        // Sanitize error message
-        $error_message = sanitize_text_field($error_message ?? 'Unknown error');
-        
         // Log with enterprise context
         ufub_log_error("Component failure: {$component_name}", array(
             'error' => $error_message,
             'timestamp' => current_time('mysql'),
             'user_context' => $this->get_user_context(),
-            'system_state' => $this->get_system_state(),
-            'component_status' => $this->get_component_status($component_name)
+            'system_state' => $this->get_system_state()
         ));
         
-        // Notify administrators with detailed context
+        // Notify administrators
         $this->notify_admin_of_component_failure($component_name, $error_message);
         
         // Update system health status
         $this->update_component_health_status($component_name, false);
-        
-        // EMERGENCY PROTOCOL: Attempt component recovery if possible
-        if ($this->should_attempt_recovery($component_name)) {
-            $this->attempt_component_recovery($component_name);
-        }
-    }
-    
-    /**
-     * EMERGENCY FIX: Get component status for diagnostics
-     */
-    private function get_component_status($component_name) {
-        $component = $this->components[$component_name] ?? null;
-        
-        return array(
-            'exists' => $component !== null,
-            'class' => $component ? get_class($component) : null,
-            'methods' => $component ? get_class_methods($component) : array(),
-            'health_check_available' => $component ? method_exists($component, 'health_check') : false
-        );
-    }
-    
-    /**
-     * EMERGENCY FIX: Determine if component recovery should be attempted
-     */
-    private function should_attempt_recovery($component_name) {
-        // Only attempt recovery for critical components
-        $critical_components = array('api', 'events');
-        return in_array($component_name, $critical_components);
-    }
-    
-    /**
-     * EMERGENCY FIX: Attempt component recovery
-     */
-    private function attempt_component_recovery($component_name) {
-        try {
-            // Clear any cached component instances
-            unset($this->components[$component_name]);
-            
-            // Attempt to reinitialize the component
-            switch ($component_name) {
-                case 'api':
-                    $this->components['api'] = $this->get_api_instance();
-                    break;
-                case 'events':
-                    $this->components['events'] = $this->get_events_instance();
-                    break;
-                default:
-                    // Generic recovery attempt
-                    $getter_method = 'get_' . $component_name . '_instance';
-                    if (method_exists($this, $getter_method)) {
-                        $this->components[$component_name] = $this->$getter_method();
-                    }
-                    break;
-            }
-            
-            // Re-validate component health
-            if (isset($this->components[$component_name])) {
-                $recovery_success = $this->validate_component_health($component_name);
-                
-                if ($recovery_success) {
-                    ufub_log_info("Component recovery successful: {$component_name}");
-                    $this->update_component_health_status($component_name, true);
-                    return true;
-                }
-            }
-            
-        } catch (Exception $e) {
-            ufub_log_error("Component recovery failed: {$component_name}", array(
-                'recovery_error' => $e->getMessage()
-            ));
-        }
-        
-        return false;
-    }
-    
-    /**
-     * EMERGENCY FIX: Enable safe mode when too many components fail
-     */
-    private function enable_safe_mode() {
-        update_option('ufub_safe_mode', true);
-        
-        ufub_log_error('System entering safe mode - too many component failures', array(
-            'healthy_components' => array_sum($this->component_health),
-            'total_components' => count($this->component_health)
-        ));
-        
-        add_action('admin_notices', function() {
-            echo '<div class="notice notice-error"><p><strong>UFUB Safe Mode:</strong> Multiple component failures detected. Some features may be disabled.</p></div>';
-        });
     }
     
     /**
@@ -2178,7 +2060,7 @@ class Ultimate_FUB_Integration {
                 dbDelta($debug_sql);
             }
             
-            // Security logs table - EMERGENCY FIX: Use 'timestamp' instead of 'created_date'
+            // Security logs table
             $security_table = $wpdb->prefix . 'ufub_security_logs';
             $security_sql = "CREATE TABLE $security_table (
                 id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -2311,10 +2193,14 @@ class Ultimate_FUB_Integration {
     }
     
     /**
-     * Memory notice
+     * Memory notice - Enhanced with current status
      */
     public function memory_notice() {
-        echo '<div class="notice notice-error"><p>Ultimate FUB Integration: Insufficient memory. Please increase PHP memory_limit to at least 128MB.</p></div>';
+        $memory_limit = ini_get('memory_limit');
+        $memory_usage = memory_get_usage(true);
+        $memory_usage_mb = round($memory_usage / 1024 / 1024, 2);
+        
+        echo '<div class="notice notice-warning"><p><strong>Ultimate FUB Integration:</strong> Memory limit may be insufficient. Current usage: ' . $memory_usage_mb . 'MB, Limit: ' . $memory_limit . '. Plugin will continue but may experience issues. Consider increasing PHP memory_limit to at least 128MB.</p></div>';
     }
     
     /**
