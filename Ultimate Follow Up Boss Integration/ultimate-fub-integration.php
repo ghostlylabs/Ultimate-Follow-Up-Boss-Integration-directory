@@ -34,7 +34,6 @@ if (!defined('UFUB_DEBUG')) {
  * and advanced component integration
  */
 class Ultimate_FUB_Integration {
-    
     private static $instance = null;
     private $components = array();
     private $initialized = false;
@@ -42,7 +41,7 @@ class Ultimate_FUB_Integration {
     private $visitor_patterns = array();
     private $component_health = array();
     private $system_health_status = array();
-    
+
     /**
      * Singleton Pattern
      */
@@ -52,7 +51,7 @@ class Ultimate_FUB_Integration {
         }
         return self::$instance;
     }
-    
+
     /**
      * Constructor - Private for singleton
      */
@@ -61,24 +60,22 @@ class Ultimate_FUB_Integration {
         if ($this->initialized) {
             return;
         }
-        
-        // Check memory before proceeding - NON-BLOCKING
+        // NON-BLOCKING memory check
         if (!$this->check_memory_requirements()) {
-            // Log warning but continue initialization
             add_action('admin_notices', array($this, 'memory_notice'));
             if (function_exists('ufub_log_warning')) {
                 ufub_log_warning('Memory requirements not met but continuing initialization', array(
                     'memory_limit' => ini_get('memory_limit'),
                     'memory_usage' => memory_get_usage(true)
                 ));
+            } else {
+                error_log('UFUB: Memory requirements not met but continuing initialization');
             }
-            // CONTINUE INITIALIZATION INSTEAD OF RETURNING
         }
-        
         // Initialize plugin
         $this->init();
     }
-    
+
     /**
      * Destructor - Restore error handler
      */
@@ -87,7 +84,7 @@ class Ultimate_FUB_Integration {
             set_error_handler($this->original_error_handler);
         }
     }
-    
+
     /**
      * Initialize plugin
      */
