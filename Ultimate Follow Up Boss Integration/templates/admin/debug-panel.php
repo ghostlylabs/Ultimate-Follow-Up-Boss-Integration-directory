@@ -9,7 +9,7 @@
  * @package Ultimate_FUB_Integration
  * @subpackage Templates
  * @version 2.1.2
- * @since 3.0.0
+ * @since 1.0.0
  */
 
 // Prevent direct access
@@ -1780,7 +1780,7 @@ console.log('✅ Real-time Monitoring: Live system analysis enabled');
 <div class="ghostly-footer" style="background: rgba(255, 255, 255, 0.02); border-top: 1px solid rgba(255, 255, 255, 0.1); margin-top: 40px; padding: 25px; text-align: center;">
    <p style="color: #ffffff; opacity: 0.6; margin: 0; font-size: 0.9em; display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap;">
        <span style="display: flex; align-items: center; gap: 6px;">
-           <span style="font-size: 1.2em;">👻</span>
+           <span style="font-size: 1.2em;">GL</span>
            <strong style="color: #3ab24a;">Ghostly Labs</strong>
        </span>
        <span style="opacity: 0.4;">•</span>

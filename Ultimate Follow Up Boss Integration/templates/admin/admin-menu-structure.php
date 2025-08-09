@@ -137,9 +137,10 @@ class UFUB_Admin_Menu_Structure {
             wp_enqueue_script('jquery-ui-tabs');
             
             // Main admin script with FIXED dependencies and paths
+            // Main admin interface scripts - FIXED: Use correct filename
             wp_enqueue_script(
                 'ufub-admin-main',
-                $this->plugin_url . 'assets/js/admin-main.js',
+                $this->plugin_url . 'assets/js/fub-admin.js',
                 array('jquery', 'jquery-ui-core', 'jquery-ui-tabs'),
                 $this->plugin_version,
                 true
@@ -190,7 +191,7 @@ class UFUB_Admin_Menu_Structure {
             }
             
             // CRITICAL FIX: Add comprehensive nonce and AJAX configuration
-            wp_localize_script('ufub-admin-main', 'ufub_admin_ajax', array(
+            wp_localize_script('ufub-admin-main', 'ufub_admin', array(
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('ufub_admin_nonce'),
                 'strings' => array(
@@ -304,8 +305,16 @@ class UFUB_Admin_Menu_Structure {
      */
     public function ajax_test_connection() {
         try {
+            // Debug logging
+            error_log('🔍 UFUB Test Connection Debug:');
+            error_log('Received nonce: ' . ($_POST['nonce'] ?? 'NOT_SET'));
+            error_log('Expected nonce action: ufub_admin_nonce');
+            error_log('User can manage_options: ' . (current_user_can('manage_options') ? 'YES' : 'NO'));
+            error_log('POST data: ' . print_r($_POST, true));
+            
             // CRITICAL: Verify nonce first
             if (!check_ajax_referer('ufub_admin_nonce', 'nonce', false)) {
+                error_log('❌ Nonce verification failed');
                 wp_send_json_error(array('message' => 'Security check failed'));
                 return;
             }
@@ -542,8 +551,8 @@ class UFUB_Admin_Menu_Structure {
     }
 }
 
-// Initialize the admin menu structure
-if (is_admin()) {
+// Initialize the admin menu structure (DISABLED - Using main plugin menu instead)
+if (false && is_admin()) {
     new UFUB_Admin_Menu_Structure();
 }
 

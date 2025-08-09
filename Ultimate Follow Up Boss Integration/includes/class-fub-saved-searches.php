@@ -1,8 +1,9 @@
 <?php
 /**
- * FUB Saved Searches Handler
+ * FUB Saved Searches Handler - CRITICAL for Managing User Searches
  * 
- * Intelligent saved search detection and management for Follow Up Boss integration
+ * Manages saved searches from users - stores criteria, retrieves for matching
+ * This is HOW we know what users are looking for to match against new properties
  * 
  * @package Ultimate_FUB_Integration
  * @subpackage Saved_Searches
@@ -33,6 +34,7 @@ class FUB_Saved_Searches {
      * Constructor
      */
     private function __construct() {
+        $this->api = FUB_API::get_instance();
         $this->init();
     }
     
@@ -40,809 +42,405 @@ class FUB_Saved_Searches {
      * Initialize saved searches
      */
     private function init() {
-        // Get API instance
-        if (class_exists('FUB_API')) {
-            $this->api = FUB_API::get_instance();
-        }
-        
-        // AJAX handlers
-        add_action('wp_ajax_ufub_create_saved_search', array($this, 'handle_create_saved_search'));
-        add_action('wp_ajax_nopriv_ufub_create_saved_search', array($this, 'handle_create_saved_search'));
+        // AJAX handlers for saved searches
+        add_action('wp_ajax_ufub_save_search', array($this, 'ajax_save_search'));
+        add_action('wp_ajax_nopriv_ufub_save_search', array($this, 'ajax_save_search'));
         
         add_action('wp_ajax_ufub_get_saved_searches', array($this, 'ajax_get_saved_searches'));
         add_action('wp_ajax_ufub_delete_saved_search', array($this, 'ajax_delete_saved_search'));
-        add_action('wp_ajax_ufub_update_saved_search', array($this, 'ajax_update_saved_search'));
         
-        // Scheduled cleanup
-        add_action('ufub_cleanup_saved_searches', array($this, 'cleanup_old_searches'));
-        
-        if (!wp_next_scheduled('ufub_cleanup_saved_searches')) {
-            wp_schedule_event(time(), 'weekly', 'ufub_cleanup_saved_searches');
-        }
-        
-        if (function_exists('ufub_log_info')) {
-            ufub_log_info('FUB Saved Searches handler initialized');
-        }
+        // Capture IDX search forms
+        add_action('wp_footer', array($this, 'inject_search_capture_js'));
     }
     
     /**
-     * Handle create saved search request
+     * Save a search from user
      */
-    public function handle_create_saved_search() {
-        check_ajax_referer('ufub_tracking_nonce', 'nonce');
-        
-        $request_data = $this->get_request_data();
-        $patterns = $request_data['patterns'] ?? array();
-        $ideal_profile = $request_data['ideal_profile'] ?? array();
-        $search_history = $request_data['search_history'] ?? array();
-        
-        if (empty($patterns) || empty($ideal_profile)) {
-            wp_send_json_error('Invalid saved search data');
-        }
-        
-        // Get person information from session
-        $person_data = $this->get_person_from_session();
-        
-        if (!$person_data) {
-            // Create anonymous person for tracking
-            $person_data = array(
-                'email' => $this->generate_anonymous_email(),
-                'first_name' => 'Anonymous',
-                'last_name' => 'Visitor'
-            );
-        }
-        
-        // Create saved search
-        $saved_search_id = $this->create_saved_search($person_data, $ideal_profile, $patterns, $search_history);
-        
-        if ($saved_search_id) {
-            // Send to FUB as a "Saved Property" event
-            $this->send_saved_search_to_fub($person_data, $ideal_profile, $saved_search_id);
-            
-            // Generate agent note
-            $this->create_agent_note($person_data, $ideal_profile, $patterns);
-            
-            wp_send_json_success(array(
-                'message' => 'Saved search created successfully',
-                'saved_search_id' => $saved_search_id,
-                'ideal_profile' => $ideal_profile
-            ));
-        } else {
-            wp_send_json_error('Failed to create saved search');
-        }
-    }
-    
-    /**
-     * Create saved search in database
-     */
-    private function create_saved_search($person_data, $ideal_profile, $patterns, $search_history) {
+    public function save_search($search_data) {
         global $wpdb;
         
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        $this->create_saved_searches_table_if_needed();
+        $table = $wpdb->prefix . 'fub_saved_searches';
         
-        $search_data = array(
-            'title' => $this->generate_search_title($ideal_profile),
-            'criteria' => wp_json_encode($ideal_profile['criteria']),
-            'patterns' => wp_json_encode($patterns),
-            'search_history' => wp_json_encode($search_history),
-            'confidence_score' => $patterns['similarity'] ?? 0,
-            'person_email' => $person_data['email'],
-            'person_name' => trim(($person_data['first_name'] ?? '') . ' ' . ($person_data['last_name'] ?? '')),
-            'status' => 'active',
-            'frequency' => $this->determine_search_frequency($search_history),
-            'price_range' => $this->extract_price_range($ideal_profile['criteria']),
-            'location' => $this->extract_location($ideal_profile['criteria']),
-            'property_type' => $ideal_profile['criteria']['property_type'] ?? '',
-            'bedrooms' => $ideal_profile['criteria']['bedrooms'] ?? '',
-            'bathrooms' => $ideal_profile['criteria']['bathrooms'] ?? '',
-            'created_date' => current_time('mysql'),
-            'last_updated' => current_time('mysql')
+        // Validate required fields
+        if (empty($search_data['user_email'])) {
+            return new WP_Error('missing_email', 'Email is required for saved searches');
+        }
+        
+        // Prepare search criteria
+        $criteria = array(
+            'location' => sanitize_text_field($search_data['location'] ?? ''),
+            'min_price' => (int) ($search_data['min_price'] ?? 0),
+            'max_price' => (int) ($search_data['max_price'] ?? 0),
+            'beds' => (int) ($search_data['beds'] ?? 0),
+            'baths' => (float) ($search_data['baths'] ?? 0),
+            'property_type' => sanitize_text_field($search_data['property_type'] ?? ''),
+            'keywords' => sanitize_text_field($search_data['keywords'] ?? '')
         );
         
-        $result = $wpdb->insert($table, $search_data, array(
-            '%s', '%s', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'
+        // Remove empty criteria
+        $criteria = array_filter($criteria);
+        
+        $search_record = array(
+            'user_email' => sanitize_email($search_data['user_email']),
+            'user_first_name' => sanitize_text_field($search_data['first_name'] ?? ''),
+            'user_last_name' => sanitize_text_field($search_data['last_name'] ?? ''),
+            'user_phone' => sanitize_text_field($search_data['phone'] ?? ''),
+            'search_criteria' => json_encode($criteria),
+            'search_frequency' => sanitize_text_field($search_data['frequency'] ?? 'daily'),
+            'is_active' => 1,
+            'created_at' => current_time('mysql'),
+            'last_checked' => current_time('mysql')
+        );
+        
+        // Check if search already exists for this user
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id FROM $table WHERE user_email = %s AND search_criteria = %s",
+            $search_record['user_email'],
+            $search_record['search_criteria']
         ));
         
-        if ($result !== false) {
-            $saved_search_id = $wpdb->insert_id;
-            
-            if (function_exists('ufub_log_info')) {
-                ufub_log_info('Saved search created', array(
-                    'saved_search_id' => $saved_search_id,
-                    'person_email' => $person_data['email'],
-                    'confidence_score' => $patterns['similarity'] ?? 0
-                ));
-            }
-            
-            return $saved_search_id;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Send saved search to FUB
-     */
-    private function send_saved_search_to_fub($person_data, $ideal_profile, $saved_search_id) {
-        if (!$this->api) {
-            return false;
-        }
-        
-        // Create a property object representing the ideal home
-        $ideal_property = $this->create_ideal_property_from_profile($ideal_profile);
-        
-        // Prepare event data for FUB
-        $event_data = array(
-            'system' => get_option('ufub_system_key', 'ufub_wordpress_integration'),
-            'source' => $this->get_source_domain(),
-            'type' => 'Saved Property',
-            'person' => $this->format_person_for_fub($person_data),
-            'property' => $ideal_property,
-            'occurred' => current_time('c'),
-            'sourceUrl' => home_url() . "?saved_search_id={$saved_search_id}",
-            'notes' => "Auto-generated saved search based on user behavior patterns (Confidence: " . round(($ideal_profile['confidence'] ?? 0) * 100) . "%)"
-        );
-        
-        $result = $this->api->make_request('POST', '/events', $event_data);
-        
-        if ($result && !isset($result['error'])) {
-            if (function_exists('ufub_log_info')) {
-                ufub_log_info('Saved search sent to FUB', array(
-                    'saved_search_id' => $saved_search_id,
-                    'fub_event_id' => $result['id'] ?? 'unknown',
-                    'person_email' => $person_data['email']
-                ));
-            }
-            
-            // Update saved search with FUB event ID
-            global $wpdb;
-            $table = $wpdb->prefix . 'ufub_saved_searches';
-            $wpdb->update(
+        if ($existing) {
+            // Update existing search
+            $result = $wpdb->update(
                 $table,
-                array('fub_event_id' => $result['id'] ?? ''),
-                array('id' => $saved_search_id),
-                array('%s'),
+                array(
+                    'search_frequency' => $search_record['search_frequency'],
+                    'is_active' => 1,
+                    'last_checked' => current_time('mysql')
+                ),
+                array('id' => $existing->id),
+                array('%s', '%d', '%s'),
                 array('%d')
             );
             
-            return true;
-        }
-        
-        if (function_exists('ufub_log_error')) {
-            ufub_log_error('Failed to send saved search to FUB', array(
-                'saved_search_id' => $saved_search_id,
-                'error' => $result['error'] ?? 'Unknown error'
+            $search_id = $existing->id;
+        } else {
+            // Insert new search
+            $result = $wpdb->insert($table, $search_record, array(
+                '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s'
             ));
+            
+            $search_id = $wpdb->insert_id;
         }
         
-        return false;
+        if ($result === false) {
+            return new WP_Error('save_failed', 'Failed to save search');
+        }
+        
+        // Send search to FUB as saved search
+        $this->send_search_to_fub($search_record, $search_id);
+        
+        return array(
+            'success' => true,
+            'search_id' => $search_id,
+            'message' => 'Search saved successfully'
+        );
     }
     
     /**
-     * Create agent note with ideal home profile
+     * Send saved search to Follow Up Boss
      */
-    private function create_agent_note($person_data, $ideal_profile, $patterns) {
-        if (!$this->api) {
+    private function send_search_to_fub($search_data, $search_id) {
+        // Create or update contact in FUB with saved search
+        $contact_data = array(
+            'first_name' => $search_data['user_first_name'],
+            'last_name' => $search_data['user_last_name'],
+            'email' => $search_data['user_email'],
+            'phone' => $search_data['user_phone'],
+            'tags' => array('Website Lead', 'Saved Search'),
+            'saved_search_criteria' => $search_data['search_criteria'],
+            'search_frequency' => $search_data['search_frequency']
+        );
+        
+        $result = $this->api->send_event('Property Inquiry', $contact_data);
+        
+        if (!is_wp_error($result) && $result['success']) {
+            // Update local record with FUB contact ID if available
+            if (!empty($result['contact_id'])) {
+                global $wpdb;
+                $table = $wpdb->prefix . 'fub_saved_searches';
+                
+                $wpdb->update(
+                    $table,
+                    array('fub_contact_id' => $result['contact_id']),
+                    array('id' => $search_id),
+                    array('%s'),
+                    array('%d')
+                );
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get all active saved searches
+     */
+    public function get_active_searches() {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'fub_saved_searches';
+        
+        $searches = $wpdb->get_results("
+            SELECT * FROM $table 
+            WHERE is_active = 1 
+            ORDER BY created_at DESC
+        ");
+        
+        // Parse search criteria JSON
+        foreach ($searches as &$search) {
+            $search->criteria = json_decode($search->search_criteria, true);
+        }
+        
+        return $searches;
+    }
+    
+    /**
+     * Get saved searches for specific user
+     */
+    public function get_user_searches($user_email) {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'fub_saved_searches';
+        
+        $searches = $wpdb->get_results($wpdb->prepare("
+            SELECT * FROM $table 
+            WHERE user_email = %s AND is_active = 1 
+            ORDER BY created_at DESC
+        ", $user_email));
+        
+        // Parse search criteria JSON
+        foreach ($searches as &$search) {
+            $search->criteria = json_decode($search->search_criteria, true);
+        }
+        
+        return $searches;
+    }
+    
+    /**
+     * Update last checked time for search
+     */
+    public function update_last_checked($search_id) {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'fub_saved_searches';
+        
+        return $wpdb->update(
+            $table,
+            array('last_checked' => current_time('mysql')),
+            array('id' => $search_id),
+            array('%s'),
+            array('%d')
+        );
+    }
+    
+    /**
+     * Deactivate saved search
+     */
+    public function deactivate_search($search_id) {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'fub_saved_searches';
+        
+        return $wpdb->update(
+            $table,
+            array('is_active' => 0),
+            array('id' => $search_id),
+            array('%d'),
+            array('%d')
+        );
+    }
+    
+    /**
+     * AJAX handler to save search
+     */
+    public function ajax_save_search() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ufub_save_search')) {
+            wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Generate comprehensive note content
-        $note_content = $this->generate_agent_note_content($ideal_profile, $patterns);
-        
-        // Get or create person in FUB first
-        $fub_result = $this->api->create_or_update_person($person_data, 'Website Activity');
-        
-        if ($fub_result['success'] && isset($fub_result['person_id'])) {
-            // Create note in FUB
-            $note_result = $this->api->create_note(
-                $fub_result['person_id'],
-                $note_content,
-                'Ideal Home Search Profile'
-            );
-            
-            if ($note_result && !isset($note_result['error'])) {
-                if (function_exists('ufub_log_info')) {
-                    ufub_log_info('Agent note created for saved search', array(
-                        'person_id' => $fub_result['person_id'],
-                        'note_id' => $note_result['id'] ?? 'unknown',
-                        'person_email' => $person_data['email']
-                    ));
-                }
-            }
-        }
-    }
-    
-    /**
-     * Generate agent note content
-     */
-    private function generate_agent_note_content($ideal_profile, $patterns) {
-        $content = "🏠 **IDEAL HOME SEARCH PROFILE** (Auto-Generated)\n\n";
-        $content .= "**Confidence Level:** " . round(($patterns['similarity'] ?? 0) * 100) . "%\n";
-        $content .= "**Generated:** " . current_time('M j, Y g:i A') . "\n\n";
-        
-        $content .= "**PREFERRED CRITERIA:**\n";
-        
-        $criteria = $ideal_profile['criteria'] ?? array();
-        
-        if (!empty($criteria['location'])) {
-            $content .= "📍 **Location:** " . $criteria['location'] . "\n";
-        }
-        
-        if (!empty($criteria['price_range'])) {
-            $content .= "💰 **Price Range:** " . $this->format_price_range($criteria['price_range']) . "\n";
-        }
-        
-        if (!empty($criteria['bedrooms'])) {
-            $content .= "🛏️ **Bedrooms:** " . $criteria['bedrooms'] . "\n";
-        }
-        
-        if (!empty($criteria['bathrooms'])) {
-            $content .= "🚿 **Bathrooms:** " . $criteria['bathrooms'] . "\n";
-        }
-        
-        if (!empty($criteria['property_type'])) {
-            $content .= "🏡 **Property Type:** " . ucfirst($criteria['property_type']) . "\n";
-        }
-        
-        $content .= "\n**SEARCH BEHAVIOR ANALYSIS:**\n";
-        
-        // Analyze search patterns
-        $most_searched_location = $this->get_most_common_value($patterns, 'location');
-        if ($most_searched_location) {
-            $content .= "• Most searched location: " . $most_searched_location . "\n";
-        }
-        
-        $most_searched_price = $this->get_most_common_value($patterns, 'price_range');
-        if ($most_searched_price) {
-            $content .= "• Consistent price range: " . $most_searched_price . "\n";
-        }
-        
-        $content .= "• Search consistency: " . round(($patterns['similarity'] ?? 0) * 100) . "% similar criteria\n";
-        
-        $content .= "\n**RECOMMENDED ACTIONS:**\n";
-        $content .= "• Set up automated property alerts for this profile\n";
-        $content .= "• Schedule follow-up call to discuss specific needs\n";
-        $content .= "• Send curated property listings matching criteria\n";
-        
-        if (($patterns['similarity'] ?? 0) > 0.8) {
-            $content .= "• HIGH CONFIDENCE: Client has very specific requirements\n";
-        }
-        
-        $content .= "\n---\n";
-        $content .= "*This profile was automatically generated based on website behavior analysis*";
-        
-        return $content;
-    }
-    
-    /**
-     * Get most common value from patterns
-     */
-    private function get_most_common_value($patterns, $key) {
-        if (!isset($patterns[$key]) || empty($patterns[$key])) {
-            return null;
-        }
-        
-        $values = $patterns[$key];
-        
-        // Find the value with the highest count
-        $max_count = 0;
-        $most_common = null;
-        
-        foreach ($values as $value => $count) {
-            if ($count > $max_count) {
-                $max_count = $count;
-                $most_common = $value;
-            }
-        }
-        
-        return $most_common;
-    }
-    
-    /**
-     * Format price range for display (FIXED SYNTAX ERROR)
-     */
-    private function format_price_range($price_range) {
-        if (strpos($price_range, '-') !== false) {
-            list($min, $max) = explode('-', $price_range);
-            return '$' . number_format((int)$min) . ' - $' . number_format((int)$max);
-        }
-        
-        return $price_range;
-    }
-    
-    /**
-     * Create ideal property from profile
-     */
-    private function create_ideal_property_from_profile($ideal_profile) {
-        $criteria = $ideal_profile['criteria'] ?? array();
-        
-        $property = array(
-            'street' => 'Ideal Home Criteria',
-            'city' => $criteria['location'] ?? 'Any',
-            'propertyType' => $criteria['property_type'] ?? 'Any'
+        $search_data = array(
+            'user_email' => sanitize_email($_POST['email'] ?? ''),
+            'first_name' => sanitize_text_field($_POST['first_name'] ?? ''),
+            'last_name' => sanitize_text_field($_POST['last_name'] ?? ''),
+            'phone' => sanitize_text_field($_POST['phone'] ?? ''),
+            'location' => sanitize_text_field($_POST['location'] ?? ''),
+            'min_price' => (int) ($_POST['min_price'] ?? 0),
+            'max_price' => (int) ($_POST['max_price'] ?? 0),
+            'beds' => (int) ($_POST['beds'] ?? 0),
+            'baths' => (float) ($_POST['baths'] ?? 0),
+            'property_type' => sanitize_text_field($_POST['property_type'] ?? ''),
+            'keywords' => sanitize_text_field($_POST['keywords'] ?? ''),
+            'frequency' => sanitize_text_field($_POST['frequency'] ?? 'daily')
         );
         
-        if (!empty($criteria['price_range'])) {
-            if (strpos($criteria['price_range'], '-') !== false) {
-                list($min_price, $max_price) = explode('-', $criteria['price_range']);
-                $property['price'] = (int)$max_price; // Use max price for the property
-            }
-        }
+        $result = $this->save_search($search_data);
         
-        if (!empty($criteria['bedrooms'])) {
-            $property['bedrooms'] = (int)$criteria['bedrooms'];
-        }
-        
-        if (!empty($criteria['bathrooms'])) {
-            $property['bathrooms'] = (float)$criteria['bathrooms'];
-        }
-        
-        return $property;
-    }
-    
-    /**
-     * Generate search title
-     */
-    private function generate_search_title($ideal_profile) {
-        $criteria = $ideal_profile['criteria'] ?? array();
-        $parts = array();
-        
-        if (!empty($criteria['bedrooms'])) {
-            $parts[] = $criteria['bedrooms'] . ' bed';
-        }
-        
-        if (!empty($criteria['bathrooms'])) {
-            $parts[] = $criteria['bathrooms'] . ' bath';
-        }
-        
-        if (!empty($criteria['property_type'])) {
-            $parts[] = $criteria['property_type'];
-        }
-        
-        if (!empty($criteria['location'])) {
-            $parts[] = 'in ' . $criteria['location'];
-        }
-        
-        if (!empty($parts)) {
-            return 'Auto-Search: ' . implode(', ', $parts);
-        }
-        
-        return 'Auto-Generated Property Search';
-    }
-    
-    /**
-     * Determine search frequency
-     */
-    private function determine_search_frequency($search_history) {
-        $count = count($search_history);
-        
-        if ($count >= 5) {
-            return 'high';
-        } elseif ($count >= 3) {
-            return 'medium';
+        if (is_wp_error($result)) {
+            wp_send_json_error($result->get_error_message());
         } else {
-            return 'low';
+            wp_send_json_success($result);
         }
     }
     
     /**
-     * Extract price range from criteria
-     */
-    private function extract_price_range($criteria) {
-        if (!empty($criteria['price_range'])) {
-            return $criteria['price_range'];
-        }
-        
-        $min = $criteria['min_price'] ?? '';
-        $max = $criteria['max_price'] ?? '';
-        
-        if ($min || $max) {
-            return ($min ?: '0') . '-' . ($max ?: '999999999');
-        }
-        
-        return '';
-    }
-    
-    /**
-     * Extract location from criteria
-     */
-    private function extract_location($criteria) {
-        return $criteria['location'] ?? $criteria['city'] ?? $criteria['neighborhood'] ?? '';
-    }
-    
-    /**
-     * Get person from session
-     */
-    private function get_person_from_session() {
-        // Try to get from WordPress user
-        if (is_user_logged_in()) {
-            $user = wp_get_current_user();
-            return array(
-                'email' => $user->user_email,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name
-            );
-        }
-        
-        // Try to get from recent tracking data
-        global $wpdb;
-        $table = $wpdb->prefix . 'ufub_tracking_data';
-        
-        $result = $wpdb->get_row(
-            "SELECT tracking_data FROM {$table} 
-             WHERE event_type IN ('registration', 'inquiry') 
-             AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-             ORDER BY timestamp DESC LIMIT 1"
-        );
-        
-        if ($result) {
-            $data = json_decode($result->tracking_data, true);
-            return $data['person_data'] ?? null;
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Generate anonymous email
-     */
-    private function generate_anonymous_email() {
-        $domain = parse_url(home_url(), PHP_URL_HOST);
-        return 'saved_search_' . time() . '_' . wp_rand(1000, 9999) . '@' . $domain;
-    }
-    
-    /**
-     * Format person for FUB
-     */
-    private function format_person_for_fub($person_data) {
-        $formatted = array();
-        
-        if (!empty($person_data['email'])) {
-            $formatted['emails'] = array(array('value' => $person_data['email']));
-        }
-        
-        if (!empty($person_data['first_name'])) {
-            $formatted['firstName'] = $person_data['first_name'];
-        }
-        
-        if (!empty($person_data['last_name'])) {
-            $formatted['lastName'] = $person_data['last_name'];
-        }
-        
-        return $formatted;
-    }
-    
-    /**
-     * Get source domain
-     */
-    private function get_source_domain() {
-        $domain = parse_url(home_url(), PHP_URL_HOST);
-        return str_replace('www.', '', $domain);
-    }
-    
-    /**
-     * Create saved searches table if needed
-     */
-    private function create_saved_searches_table_if_needed() {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") != $table) {
-            $charset_collate = $wpdb->get_charset_collate();
-            
-            $sql = "CREATE TABLE $table (
-                id bigint(20) NOT NULL AUTO_INCREMENT,
-                title varchar(255) NOT NULL,
-                criteria longtext,
-                patterns longtext,
-                search_history longtext,
-                confidence_score decimal(3,2),
-                person_email varchar(255),
-                person_name varchar(255),
-                fub_contact_id varchar(100),
-                fub_event_id varchar(100),
-                status varchar(20) DEFAULT 'active',
-                frequency varchar(20),
-                price_range varchar(100),
-                location varchar(255),
-                property_type varchar(100),
-                bedrooms varchar(10),
-                bathrooms varchar(10),
-                last_match_count int(11) DEFAULT 0,
-                last_match_date datetime,
-                created_date datetime DEFAULT CURRENT_TIMESTAMP,
-                last_updated datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY (id),
-                KEY person_email (person_email),
-                KEY status (status),
-                KEY location (location),
-                KEY price_range (price_range),
-                KEY created_date (created_date)
-            ) $charset_collate;";
-            
-            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-            dbDelta($sql);
-            
-            if (function_exists('ufub_log_info')) {
-                ufub_log_info('Saved searches table created');
-            }
-        }
-    }
-    
-    /**
-     * Get all saved searches
-     */
-    public function get_saved_searches($limit = 50, $offset = 0, $filters = array()) {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        $this->create_saved_searches_table_if_needed();
-        
-        $where = array('1=1');
-        $where_values = array();
-        
-        // Apply filters
-        if (!empty($filters['status'])) {
-            $where[] = 'status = %s';
-            $where_values[] = $filters['status'];
-        }
-        
-        if (!empty($filters['person_email'])) {
-            $where[] = 'person_email = %s';
-            $where_values[] = $filters['person_email'];
-        }
-        
-        if (!empty($filters['location'])) {
-            $where[] = 'location LIKE %s';
-            $where_values[] = '%' . $filters['location'] . '%';
-        }
-        
-        if (!empty($filters['date_from'])) {
-            $where[] = 'created_date >= %s';
-            $where_values[] = $filters['date_from'];
-        }
-        
-        if (!empty($filters['date_to'])) {
-            $where[] = 'created_date <= %s';
-            $where_values[] = $filters['date_to'];
-        }
-        
-        $where_clause = implode(' AND ', $where);
-        
-        $sql = "SELECT * FROM {$table} WHERE {$where_clause} ORDER BY created_date DESC LIMIT %d OFFSET %d";
-        $where_values[] = $limit;
-        $where_values[] = $offset;
-        
-        if (!empty($where_values)) {
-            $sql = $wpdb->prepare($sql, $where_values);
-        }
-        
-        return $wpdb->get_results($sql, ARRAY_A);
-    }
-    
-    /**
-     * Update saved search
-     */
-    public function update_saved_search($search_id, $data) {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        
-        $update_data = array();
-        $format = array();
-        
-        $allowed_fields = array(
-            'title' => '%s',
-            'status' => '%s',
-            'frequency' => '%s',
-            'criteria' => '%s',
-            'last_match_count' => '%d',
-            'last_match_date' => '%s'
-        );
-        
-        foreach ($data as $key => $value) {
-            if (isset($allowed_fields[$key])) {
-                $update_data[$key] = $value;
-                $format[] = $allowed_fields[$key];
-            }
-        }
-        
-        if (!empty($update_data)) {
-            $update_data['last_updated'] = current_time('mysql');
-            $format[] = '%s';
-            
-            $result = $wpdb->update(
-                $table,
-                $update_data,
-                array('id' => $search_id),
-                $format,
-                array('%d')
-            );
-            
-            return $result !== false;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Delete saved search
-     */
-    public function delete_saved_search($search_id) {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        
-        $result = $wpdb->delete(
-            $table,
-            array('id' => $search_id),
-            array('%d')
-        );
-        
-        if ($result !== false && function_exists('ufub_log_info')) {
-            ufub_log_info('Saved search deleted', array('search_id' => $search_id));
-        }
-        
-        return $result !== false;
-    }
-    
-    /**
-     * Cleanup old searches
-     */
-    public function cleanup_old_searches() {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        
-        // Delete inactive searches older than 6 months
-        $result = $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$table} WHERE status = 'inactive' AND created_date < DATE_SUB(NOW(), INTERVAL 6 MONTH)"
-        ));
-        
-        if ($result > 0 && function_exists('ufub_log_info')) {
-            ufub_log_info('Cleaned up old saved searches', array('deleted_count' => $result));
-        }
-        
-        // Mark searches as inactive if no activity for 3 months
-        $wpdb->query($wpdb->prepare(
-            "UPDATE {$table} SET status = 'inactive' 
-             WHERE status = 'active' 
-             AND (last_match_date IS NULL OR last_match_date < DATE_SUB(NOW(), INTERVAL 3 MONTH))
-             AND created_date < DATE_SUB(NOW(), INTERVAL 3 MONTH)"
-        ));
-    }
-    
-    /**
-     * Get request data from AJAX
-     */
-    private function get_request_data() {
-        $data = $_POST['data'] ?? '';
-        
-        if (empty($data)) {
-            return array();
-        }
-        
-        return json_decode(stripslashes($data), true) ?: array();
-    }
-    
-    /**
-     * AJAX: Get saved searches
+     * AJAX handler to get saved searches
      */
     public function ajax_get_saved_searches() {
-        check_ajax_referer('ufub_nonce', 'nonce');
+        // Check nonce for admin requests
+        check_ajax_referer('ufub_admin_nonce', 'nonce');
         
+        // Check permissions for admin access
         if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
+            wp_send_json_error('Permission denied');
         }
         
-        $limit = (int) ($_POST['limit'] ?? 50);
-        $offset = (int) ($_POST['offset'] ?? 0);
-        $filters = $_POST['filters'] ?? array();
+        // If email provided, get user-specific searches
+        $user_email = sanitize_email($_POST['email'] ?? '');
         
-        $searches = $this->get_saved_searches($limit, $offset, $filters);
+        if (!empty($user_email)) {
+            $searches = $this->get_user_searches($user_email);
+        } else {
+            // Get all saved searches for admin dashboard
+            $searches = $this->get_active_searches();
+        }
         
-        // Get total count
-        global $wpdb;
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        $total = $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
-        
-        wp_send_json_success(array(
-            'searches' => $searches,
-            'total' => (int) $total,
-            'limit' => $limit,
-            'offset' => $offset
-        ));
+        wp_send_json_success($searches);
     }
     
     /**
-     * AJAX: Delete saved search
+     * AJAX handler to delete saved search
      */
     public function ajax_delete_saved_search() {
-        check_ajax_referer('ufub_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ufub_delete_search')) {
+            wp_send_json_error('Invalid nonce');
+            return;
         }
         
         $search_id = (int) ($_POST['search_id'] ?? 0);
         
-        if ($search_id <= 0) {
+        if (!$search_id) {
             wp_send_json_error('Invalid search ID');
+            return;
         }
         
-        if ($this->delete_saved_search($search_id)) {
-            wp_send_json_success('Saved search deleted successfully');
+        $result = $this->deactivate_search($search_id);
+        
+        if ($result !== false) {
+            wp_send_json_success('Search deleted');
         } else {
-            wp_send_json_error('Failed to delete saved search');
+            wp_send_json_error('Failed to delete search');
         }
     }
     
     /**
-     * AJAX: Update saved search
+     * Inject JavaScript to capture IDX searches
      */
-    public function ajax_update_saved_search() {
-        check_ajax_referer('ufub_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
+    public function inject_search_capture_js() {
+        if (!is_page() && !is_single()) {
+            return; // Only on pages that might have IDX forms
         }
         
-        $search_id = (int) ($_POST['search_id'] ?? 0);
-        $update_data = $_POST['data'] ?? array();
-        
-        if ($search_id <= 0) {
-            wp_send_json_error('Invalid search ID');
-        }
-        
-        if ($this->update_saved_search($search_id, $update_data)) {
-            wp_send_json_success('Saved search updated successfully');
-        } else {
-            wp_send_json_error('Failed to update saved search');
-        }
-    }
-    
-    /**
-     * Get saved search statistics
-     */
-    public function get_saved_search_stats() {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_saved_searches';
-        $this->create_saved_searches_table_if_needed();
-        
-        $stats = array();
-        
-        // Total searches
-        $stats['total'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
-        
-        // Active searches
-        $stats['active'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE status = 'active'");
-        
-        // Today's searches
-        $stats['today'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE DATE(created_date) = CURDATE()");
-        
-        // This week's searches
-        $stats['this_week'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE created_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
-        
-        // High confidence searches (>80%)
-        $stats['high_confidence'] = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE confidence_score > 0.8");
-        
-        // Most popular locations
-        $stats['popular_locations'] = $wpdb->get_results(
-            "SELECT location, COUNT(*) as count 
-             FROM {$table} 
-             WHERE location != '' 
-             GROUP BY location 
-             ORDER BY count DESC 
-             LIMIT 5",
-            ARRAY_A
-        );
-        
-        // Average confidence score
-        $stats['avg_confidence'] = (float) $wpdb->get_var("SELECT AVG(confidence_score) FROM {$table}");
-        
-        return $stats;
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            // Capture IDX search forms
+            $('form[action*="search"], form.property-search, .idx-search-form').on('submit', function(e) {
+                var form = $(this);
+                var searchData = {
+                    location: form.find('input[name*="location"], input[name*="city"], input[name*="area"]').val() || '',
+                    min_price: form.find('input[name*="min_price"], select[name*="min_price"]').val() || '',
+                    max_price: form.find('input[name*="max_price"], select[name*="max_price"]').val() || '',
+                    beds: form.find('select[name*="bed"], input[name*="bed"]').val() || '',
+                    baths: form.find('select[name*="bath"], input[name*="bath"]').val() || '',
+                    property_type: form.find('select[name*="type"], input[name*="type"]:checked').val() || ''
+                };
+                
+                // Check if this looks like a property search
+                if (searchData.location || searchData.min_price || searchData.max_price || searchData.beds) {
+                    // Store search data for later capture
+                    sessionStorage.setItem('ufub_last_search', JSON.stringify(searchData));
+                    
+                    // Show save search popup after a delay
+                    setTimeout(function() {
+                        ufub_show_save_search_popup(searchData);
+                    }, 3000);
+                }
+            });
+            
+            // Function to show save search popup
+            window.ufub_show_save_search_popup = function(searchData) {
+                if ($('#ufub-save-search-popup').length > 0) {
+                    return; // Already shown
+                }
+                
+                var popup = $('<div id="ufub-save-search-popup" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;max-width:400px;width:90%;">')
+                    .html(`
+                        <h3>Save Your Search</h3>
+                        <p>Get notified when new properties match your criteria!</p>
+                        <form id="ufub-save-search-form">
+                            <input type="email" name="email" placeholder="Your Email" required style="width:100%;margin:5px 0;padding:8px;">
+                            <input type="text" name="first_name" placeholder="First Name" style="width:48%;margin:5px 1%;padding:8px;">
+                            <input type="text" name="last_name" placeholder="Last Name" style="width:48%;margin:5px 1%;padding:8px;">
+                            <input type="tel" name="phone" placeholder="Phone (optional)" style="width:100%;margin:5px 0;padding:8px;">
+                            <select name="frequency" style="width:100%;margin:5px 0;padding:8px;">
+                                <option value="daily">Daily updates</option>
+                                <option value="weekly">Weekly updates</option>
+                                <option value="monthly">Monthly updates</option>
+                            </select>
+                            <div style="margin:10px 0;">
+                                <button type="submit" style="background:#007cba;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;">Save Search</button>
+                                <button type="button" onclick="$('#ufub-save-search-popup').remove()" style="background:#ccc;color:#333;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;margin-left:10px;">No Thanks</button>
+                            </div>
+                        </form>
+                    `);
+                
+                $('body').append(popup);
+                
+                // Handle form submission
+                $('#ufub-save-search-form').on('submit', function(e) {
+                    e.preventDefault();
+                    
+                    var formData = {
+                        action: 'ufub_save_search',
+                        nonce: '<?php echo wp_create_nonce('ufub_save_search'); ?>',
+                        email: $(this).find('[name="email"]').val(),
+                        first_name: $(this).find('[name="first_name"]').val(),
+                        last_name: $(this).find('[name="last_name"]').val(),
+                        phone: $(this).find('[name="phone"]').val(),
+                        frequency: $(this).find('[name="frequency"]').val(),
+                        location: searchData.location,
+                        min_price: searchData.min_price,
+                        max_price: searchData.max_price,
+                        beds: searchData.beds,
+                        baths: searchData.baths,
+                        property_type: searchData.property_type
+                    };
+                    
+                    $.ajax({
+                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                        type: 'POST',
+                        data: formData,
+                        success: function(response) {
+                            if (response.success) {
+                                popup.html('<div style="text-align:center;"><h3>Search Saved!</h3><p>You\'ll receive email alerts when new properties match your criteria.</p><button onclick="$(this).closest(\'#ufub-save-search-popup\').remove()" style="background:#007cba;color:white;padding:10px 20px;border:none;border-radius:4px;cursor:pointer;">Close</button></div>');
+                                setTimeout(function() { popup.remove(); }, 3000);
+                            } else {
+                                alert('Error saving search: ' + response.data);
+                            }
+                        },
+                        error: function() {
+                            alert('Error saving search. Please try again.');
+                        }
+                    });
+                });
+            };
+        });
+        </script>
+        <?php
     }
 }
+?>

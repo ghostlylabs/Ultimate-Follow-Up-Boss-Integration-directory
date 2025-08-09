@@ -1,0 +1,816 @@
+/* Ghostly Labs Ultimate Follow Up Boss Integration - Admin Styles
+ * Version: 2.1.2
+ * Premium AI-Powered Real Estate Integration
+ * Brand: Ghostly Labs - Artificial Intelligence
+ */
+
+/* Main Container - Ghostly Dark Theme */
+.ufub-admin-wrap {
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 25%, #2d2d2d 75%, #1a1a1a 100%);
+    min-height: calc(100vh - 32px);
+    margin: 0 -20px -10px -20px;
+    padding: 0;
+    color: #ffffff;
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+}
+
+/* Ghostly Labs Animated Background Effect */
+.ufub-admin-wrap::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(58, 178, 74, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(58, 178, 74, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 40% 60%, rgba(58, 178, 74, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 60% 20%, rgba(46, 160, 64, 0.03) 0%, transparent 50%);
+    pointer-events: none;
+    animation: backgroundPulse 8s ease-in-out infinite;
+}
+
+@keyframes backgroundPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Ghostly Labs Header Section */
+.ufub-admin-header {
+    text-align: center;
+    padding: 60px 40px 50px;
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(180deg, rgba(58, 178, 74, 0.05) 0%, transparent 100%);
+}
+
+/* Ghostly Labs Brand Identity */
+.ufub-title {
+    margin: 0 0 25px 0;
+    font-weight: 300;
+    line-height: 1.2;
+}
+
+.ufub-brand {
+    display: block;
+    font-size: 3.8em;
+    font-weight: 700;
+    background: linear-gradient(45deg, #3ab24a, #2ea040, #3ab24a, #2d8f3a);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 4s ease infinite;
+    text-shadow: 0 0 40px rgba(58, 178, 74, 0.4);
+    letter-spacing: -2px;
+    position: relative;
+}
+
+.ufub-brand::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent, rgba(58, 178, 74, 0.1), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+
+.ufub-subtitle {
+    display: block;
+    font-size: 2.0em;
+    color: #ffffff;
+    font-weight: 300;
+    margin-top: 15px;
+    opacity: 0.95;
+    letter-spacing: 0.5px;
+}
+
+/* Artificial Intelligence Badge */
+.ufub-ai-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 25px;
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-top: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(58, 178, 74, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.ufub-ai-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: badgeShine 2s infinite;
+}
+
+@keyframes badgeShine {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Gradient Animation */
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    25% { background-position: 50% 0%; }
+    50% { background-position: 100% 50%; }
+    75% { background-position: 50% 100%; }
+}
+
+/* Content Area */
+.ufub-admin-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px 60px;
+    position: relative;
+    z-index: 2;
+}
+
+/* Ghostly Labs Stats Grid */
+.ufub-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 35px;
+    margin-bottom: 60px;
+}
+
+.ufub-stat-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 24px;
+    padding: 35px;
+    text-align: center;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(58, 178, 74, 0.2);
+    box-shadow: 
+        0 30px 60px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.ufub-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #3ab24a, transparent);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.ufub-stat-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: rgba(58, 178, 74, 0.4);
+    box-shadow: 
+        0 40px 80px rgba(0, 0, 0, 0.7),
+        0 0 60px rgba(58, 178, 74, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.ufub-stat-card:hover::before {
+    opacity: 1;
+}
+
+.ufub-stat-icon {
+    font-size: 3.5em;
+    margin-bottom: 20px;
+    opacity: 0.9;
+    filter: drop-shadow(0 0 10px rgba(58, 178, 74, 0.3));
+}
+
+.ufub-stat-number {
+    font-size: 2.8em;
+    font-weight: bold;
+    color: #3ab24a;
+    margin-bottom: 12px;
+    text-shadow: 0 0 25px rgba(58, 178, 74, 0.6);
+    background: linear-gradient(45deg, #3ab24a, #2ea040);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.ufub-stat-label {
+    font-size: 1.2em;
+    color: #e0e0e0;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Ghostly Labs Settings Sections */
+.ufub-settings-section {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(15px);
+    padding: 30px;
+    margin: 25px 0;
+    border-radius: 20px;
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(58, 178, 74, 0.15);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.ufub-settings-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #3ab24a, #2ea040);
+    border-radius: 0 4px 4px 0;
+}
+
+.ufub-settings-section:hover {
+    border-color: rgba(58, 178, 74, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(58, 178, 74, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.ufub-settings-section h2 {
+    margin-top: 0;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 1.4em;
+    font-weight: 600;
+}
+
+.ufub-settings-section .dashicons {
+    font-size: 24px;
+    color: #3ab24a;
+    filter: drop-shadow(0 0 8px rgba(58, 178, 74, 0.4));
+}
+
+/* Enhanced Form Elements */
+.form-table th {
+    width: 220px;
+    font-weight: 600;
+    color: #e0e0e0;
+    vertical-align: top;
+    padding-top: 15px;
+}
+
+.form-table td {
+    padding: 12px 10px;
+}
+
+.form-table input[type="text"],
+.form-table input[type="password"],
+.form-table input[type="number"],
+.form-table input[type="email"],
+.form-table textarea,
+.form-table select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #ffffff;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    width: 100%;
+    max-width: 400px;
+}
+
+.form-table input[type="text"]:focus,
+.form-table input[type="password"]:focus,
+.form-table input[type="number"]:focus,
+.form-table input[type="email"]:focus,
+.form-table textarea:focus,
+.form-table select:focus {
+    outline: none;
+    border-color: #3ab24a;
+    box-shadow: 0 0 20px rgba(58, 178, 74, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.form-table input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.2);
+    accent-color: #3ab24a;
+}
+
+/* Ghostly Labs Button System */
+.button-hero {
+    border-radius: 12px !important;
+    text-decoration: none !important;
+    padding: 18px 35px;
+    font-size: 16px;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ufub-test-btn {
+    background: linear-gradient(135deg, #3ab24a 0%, #2ea040 100%);
+    color: white;
+    border: none;
+    padding: 25px 20px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-height: 120px;
+    justify-content: center;
+    box-shadow: 0 8px 25px rgba(58, 178, 74, 0.3);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ufub-test-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.ufub-test-btn:hover {
+    background: linear-gradient(135deg, #2ea040 0%, #259a36 100%);
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 15px 35px rgba(58, 178, 74, 0.4);
+    color: white;
+}
+
+.ufub-test-btn:hover::before {
+    left: 100%;
+}
+
+.ufub-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 25px;
+    background: linear-gradient(135deg, #3ab24a 0%, #2ea040 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 16px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(58, 178, 74, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.ufub-action-btn:hover {
+    color: white !important;
+    text-decoration: none !important;
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 15px 35px rgba(58, 178, 74, 0.4);
+}
+
+/* Premium Status Indicators */
+.status-indicator {
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.status-connected {
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+    box-shadow: 0 4px 15px rgba(58, 178, 74, 0.3);
+}
+
+.status-disconnected {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.status-warning {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    color: #212529;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+/* Enhanced Activity Section */
+.activity-item {
+    display: flex;
+    align-items: center;
+    padding: 18px;
+    border-bottom: 1px solid rgba(58, 178, 74, 0.1);
+    gap: 20px;
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+
+.activity-item:hover {
+    background: rgba(58, 178, 74, 0.05);
+    border-color: rgba(58, 178, 74, 0.2);
+    transform: translateX(8px);
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4em;
+    box-shadow: 0 4px 15px rgba(58, 178, 74, 0.3);
+}
+
+.activity-details {
+    flex: 1;
+}
+
+.activity-type {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 1.1em;
+}
+
+.activity-time {
+    font-size: 0.95em;
+    color: #b0b0b0;
+    margin-top: 4px;
+}
+
+/* Enhanced Notices */
+.notice {
+    margin: 20px 0;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    border: none;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.notice-success {
+    background: rgba(58, 178, 74, 0.1);
+    border-left: 4px solid #3ab24a;
+    color: #3ab24a;
+}
+
+.notice-error {
+    background: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid #dc3545;
+    color: #dc3545;
+}
+
+.notice-warning {
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid #ffc107;
+    color: #ffc107;
+}
+
+/* Testing Suite Enhancement */
+.ufub-testing-suite {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 24px;
+    padding: 45px;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(58, 178, 74, 0.2);
+    box-shadow: 
+        0 30px 60px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ufub-testing-suite::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3ab24a, #2ea040, #3ab24a);
+    background-size: 200% 100%;
+    animation: gradientFlow 3s ease infinite;
+}
+
+@keyframes gradientFlow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.ufub-testing-suite h3 {
+    color: #ffffff;
+    margin-bottom: 35px;
+    font-size: 1.6em;
+    font-weight: 400;
+    text-align: center;
+}
+
+.ufub-test-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 25px;
+    margin-bottom: 35px;
+}
+
+/* API Status Enhancement */
+.api-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 25px;
+    backdrop-filter: blur(10px);
+}
+
+.status-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #dc3232;
+    box-shadow: 0 0 15px rgba(220, 50, 50, 0.5);
+    animation: statusPulse 2s infinite;
+}
+
+.status-dot.connected {
+    background: #3ab24a;
+    box-shadow: 0 0 15px rgba(58, 178, 74, 0.5);
+}
+
+.status-dot.warning {
+    background: #ffb900;
+    box-shadow: 0 0 15px rgba(255, 185, 0, 0.5);
+}
+
+@keyframes statusPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+/* Webhook URL Display */
+.webhook-url {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    color: #3ab24a;
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    word-break: break-all;
+}
+
+/* Loading States */
+.ufub-loading {
+    opacity: 0.7;
+    pointer-events: none;
+    position: relative;
+}
+
+.ufub-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border: 3px solid rgba(58, 178, 74, 0.3);
+    border-radius: 50%;
+    border-top-color: #3ab24a;
+    animation: ghostlySpinner 1s linear infinite;
+}
+
+@keyframes ghostlySpinner {
+    to { transform: rotate(360deg); }
+}
+
+/* Error/Warning/Success States */
+.error-state {
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    border-left: 4px solid #dc3545;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px 0;
+    backdrop-filter: blur(10px);
+}
+
+.warning-state {
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-left: 4px solid #ffc107;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px 0;
+    backdrop-filter: blur(10px);
+}
+
+.success-state {
+    background: rgba(58, 178, 74, 0.1);
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    border-left: 4px solid #3ab24a;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px 0;
+    backdrop-filter: blur(10px);
+}
+
+/* Responsive Design - Mobile First */
+@media (max-width: 1024px) {
+    .ufub-admin-content {
+        padding: 0 30px 50px;
+    }
+    
+    .ufub-stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 25px;
+    }
+}
+
+@media (max-width: 768px) {
+    .ufub-admin-content {
+        padding: 0 20px 40px;
+    }
+    
+    .ufub-admin-header {
+        padding: 40px 20px 35px;
+    }
+    
+    .ufub-brand {
+        font-size: 2.8em;
+    }
+    
+    .ufub-subtitle {
+        font-size: 1.6em;
+    }
+    
+    .ufub-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .ufub-settings-section {
+        margin: 15px 0;
+        padding: 20px;
+    }
+    
+    .button-hero {
+        width: 100%;
+        margin: 8px 0 !important;
+    }
+    
+    .ufub-test-buttons {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ufub-brand {
+        font-size: 2.2em;
+        letter-spacing: -1px;
+    }
+    
+    .ufub-subtitle {
+        font-size: 1.3em;
+    }
+    
+    .ufub-admin-header {
+        padding: 30px 15px 25px;
+    }
+    
+    .ufub-admin-content {
+        padding: 0 15px 30px;
+    }
+    
+    .ufub-stat-card {
+        padding: 25px 20px;
+    }
+    
+    .ufub-settings-section {
+        padding: 15px;
+    }
+    
+    .form-table th {
+        width: auto;
+        display: block;
+        padding-bottom: 5px;
+    }
+    
+    .form-table td {
+        display: block;
+        padding-top: 0;
+    }
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #2ea040, #259a36);
+}
+
+/* Performance Optimizations */
+.ufub-admin-wrap * {
+    box-sizing: border-box;
+}
+
+/* Hardware Acceleration */
+.ufub-stat-card,
+.ufub-test-btn,
+.ufub-action-btn,
+.ufub-settings-section {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* Focus Accessibility */
+.ufub-test-btn:focus,
+.ufub-action-btn:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid #3ab24a;
+    outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+    .ufub-admin-wrap {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .ufub-admin-wrap::before {
+        display: none;
+    }
+    
+    .ufub-brand {
+        -webkit-text-fill-color: #3ab24a !important;
+        color: #3ab24a !important;
+    }
+}

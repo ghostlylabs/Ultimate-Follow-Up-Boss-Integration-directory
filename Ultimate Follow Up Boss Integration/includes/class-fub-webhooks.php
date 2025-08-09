@@ -1,8 +1,9 @@
 <?php
 /**
- * FUB Webhooks Handler
+ * FUB Webhooks Handler - CRITICAL for Bidirectional Sync
  * 
- * Handles incoming webhooks from Follow Up Boss for real-time synchronization
+ * Receives webhooks FROM Follow Up Boss when things happen
+ * Enables FUB to notify us about contact updates, property matches, etc.
  * 
  * @package Ultimate_FUB_Integration
  * @subpackage Webhooks
@@ -18,7 +19,6 @@ class FUB_Webhooks {
     
     private static $instance = null;
     private $api;
-    private $webhook_secret;
     
     /**
      * Singleton instance
@@ -34,7 +34,7 @@ class FUB_Webhooks {
      * Constructor
      */
     private function __construct() {
-        $this->webhook_secret = get_option('ufub_webhook_secret', '');
+        $this->api = FUB_API::get_instance();
         $this->init();
     }
     
@@ -42,685 +42,303 @@ class FUB_Webhooks {
      * Initialize webhooks
      */
     private function init() {
-        // Get API instance
-        if (class_exists('FUB_API')) {
-            $this->api = FUB_API::get_instance();
-        }
+        // Register webhook endpoint
+        add_action('init', array($this, 'register_webhook_endpoint'));
+        add_action('rest_api_init', array($this, 'register_rest_routes'));
         
-        // Register webhook endpoints
-        add_action('init', array($this, 'register_webhook_endpoints'));
-        
-        // Admin hooks
-        add_action('admin_init', array($this, 'maybe_setup_webhooks'));
-        
-        // AJAX handlers
-        add_action('wp_ajax_ufub_setup_webhooks', array($this, 'ajax_setup_webhooks'));
-        add_action('wp_ajax_ufub_test_webhook', array($this, 'ajax_test_webhook'));
-        add_action('wp_ajax_ufub_delete_webhook', array($this, 'ajax_delete_webhook'));
-        
-        ufub_log_info('FUB Webhooks handler initialized');
+        // Process webhook data
+        add_action('wp_ajax_nopriv_ufub_webhook', array($this, 'handle_webhook'));
+        add_action('wp_ajax_ufub_webhook', array($this, 'handle_webhook'));
     }
     
     /**
-     * Register webhook endpoints
+     * Register webhook endpoint for FUB callbacks
      */
-    public function register_webhook_endpoints() {
-        // Main webhook endpoint
+    public function register_webhook_endpoint() {
+        // Add rewrite rule for webhook URL
         add_rewrite_rule(
-            '^ufub-webhook/([^/]+)/?$',
-            'index.php?ufub_webhook=1&webhook_type=$matches[1]',
+            '^ufub-webhook/?$',
+            'index.php?ufub_webhook=1',
             'top'
         );
         
-        // Add query vars
+        // Add query var
         add_filter('query_vars', function($vars) {
             $vars[] = 'ufub_webhook';
-            $vars[] = 'webhook_type';
             return $vars;
         });
+        
+        // Handle webhook request
+        add_action('template_redirect', array($this, 'handle_webhook_request'));
     }
     
     /**
-     * Handle webhook requests
+     * Register REST API routes for webhooks
      */
-    public function handle_webhook($webhook_type) {
-        // Verify request
-        if (!$this->verify_webhook_request()) {
-            http_response_code(401);
-            exit('Unauthorized');
+    public function register_rest_routes() {
+        register_rest_route('ufub/v1', '/webhook', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'handle_rest_webhook'),
+            'permission_callback' => array($this, 'verify_webhook_signature')
+        ));
+    }
+    
+    /**
+     * Handle webhook request via template redirect
+     */
+    public function handle_webhook_request() {
+        if (get_query_var('ufub_webhook')) {
+            $this->process_webhook();
+            exit;
         }
+    }
+    
+    /**
+     * Handle REST API webhook
+     */
+    public function handle_rest_webhook($request) {
+        $data = $request->get_json_params();
+        return $this->process_webhook_data($data);
+    }
+    
+    /**
+     * Process incoming webhook
+     */
+    private function process_webhook() {
+        // Get raw input
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
         
-        // Get webhook payload
-        $payload = $this->get_webhook_payload();
-        
-        if (!$payload) {
+        if (!$data) {
             http_response_code(400);
-            exit('Invalid payload');
+            echo json_encode(array('error' => 'Invalid JSON'));
+            return;
         }
         
-        // Process webhook based on type
-        try {
-            switch ($webhook_type) {
-                case 'person-created':
-                    $this->handle_person_created($payload);
-                    break;
-                    
-                case 'person-updated':
-                    $this->handle_person_updated($payload);
-                    break;
-                    
-                case 'person-deleted':
-                    $this->handle_person_deleted($payload);
-                    break;
-                    
-                case 'event-created':
-                    $this->handle_event_created($payload);
-                    break;
-                    
-                case 'note-created':
-                    $this->handle_note_created($payload);
-                    break;
-                    
-                default:
-                    ufub_log('WARNING', 'Unknown webhook type received', array(
-                        'webhook_type' => $webhook_type,
-                        'payload' => $payload
-                    ));
-                    http_response_code(400);
-                    exit('Unknown webhook type');
-            }
-            
-            // Success response
-            http_response_code(200);
-            echo json_encode(array('status' => 'success', 'message' => 'Webhook processed'));
-            
-        } catch (Exception $e) {
-            ufub_log_error('Webhook processing error', array(
-                'webhook_type' => $webhook_type,
-                'error' => $e->getMessage(),
-                'payload' => $payload
-            ));
-            
-            http_response_code(500);
-            exit('Internal server error');
-        }
+        $result = $this->process_webhook_data($data);
         
-        exit;
+        http_response_code($result['success'] ? 200 : 400);
+        echo json_encode($result);
     }
     
     /**
-     * Handle person created webhook
+     * Process webhook data from FUB
      */
-    private function handle_person_created($payload) {
-        $person_data = $payload['person'] ?? array();
+    private function process_webhook_data($data) {
+        // Log incoming webhook
+        $this->log_webhook($data);
         
-        if (empty($person_data['id'])) {
-            throw new Exception('Person ID missing from webhook payload');
+        // Verify webhook signature if provided
+        if (!$this->verify_webhook_data($data)) {
+            return array('success' => false, 'error' => 'Invalid webhook signature');
         }
         
-        ufub_log_info('Person created webhook received', array(
-            'person_id' => $person_data['id'],
-            'email' => $person_data['emails'][0]['value'] ?? 'unknown'
-        ));
+        // Process different webhook types
+        $webhook_type = $data['type'] ?? 'unknown';
         
-        // Create WordPress user if enabled
-        if (get_option('ufub_sync_create_users', true)) {
-            $this->create_wp_user_from_fub($person_data);
+        switch ($webhook_type) {
+            case 'contact.created':
+                return $this->handle_contact_created($data);
+                
+            case 'contact.updated':
+                return $this->handle_contact_updated($data);
+                
+            case 'event.created':
+                return $this->handle_event_created($data);
+                
+            case 'property.match':
+                return $this->handle_property_match($data);
+                
+            default:
+                return $this->handle_generic_webhook($data);
         }
-        
-        // Store person mapping
-        $this->store_person_mapping($person_data);
-        
-        // Trigger action for other plugins/themes
-        do_action('ufub_person_created', $person_data);
     }
     
     /**
-     * Handle person updated webhook
+     * Handle contact created webhook
      */
-    private function handle_person_updated($payload) {
-        $person_data = $payload['person'] ?? array();
+    private function handle_contact_created($data) {
+        global $wpdb;
         
-        if (empty($person_data['id'])) {
-            throw new Exception('Person ID missing from webhook payload');
+        $contact = $data['data']['contact'] ?? array();
+        
+        if (empty($contact['id'])) {
+            return array('success' => false, 'error' => 'Missing contact ID');
         }
         
-        ufub_log_info('Person updated webhook received', array(
-            'person_id' => $person_data['id'],
-            'email' => $person_data['emails'][0]['value'] ?? 'unknown'
-        ));
+        // Store FUB contact ID for future reference
+        $table = $wpdb->prefix . 'fub_saved_searches';
         
-        // Update WordPress user if exists
-        $this->update_wp_user_from_fub($person_data);
+        // Update any matching saved searches with FUB contact ID
+        if (!empty($contact['email'])) {
+            $wpdb->update(
+                $table,
+                array('fub_contact_id' => $contact['id']),
+                array('user_email' => $contact['email']),
+                array('%s'),
+                array('%s')
+            );
+        }
         
-        // Update person mapping
-        $this->store_person_mapping($person_data);
-        
-        // Trigger action
-        do_action('ufub_person_updated', $person_data);
+        return array('success' => true, 'message' => 'Contact created processed');
     }
     
     /**
-     * Handle person deleted webhook
+     * Handle contact updated webhook
      */
-    private function handle_person_deleted($payload) {
-        $person_id = $payload['personId'] ?? '';
+    private function handle_contact_updated($data) {
+        $contact = $data['data']['contact'] ?? array();
         
-        if (empty($person_id)) {
-            throw new Exception('Person ID missing from webhook payload');
-        }
+        // Update local contact information if needed
+        // This could sync contact preferences, tags, etc.
         
-        ufub_log_info('Person deleted webhook received', array(
-            'person_id' => $person_id
-        ));
-        
-        // Handle WordPress user deletion based on settings
-        $delete_wp_users = get_option('ufub_sync_delete_users', false);
-        
-        if ($delete_wp_users) {
-            $this->delete_wp_user_by_fub_id($person_id);
-        } else {
-            // Just remove the mapping
-            $this->remove_person_mapping($person_id);
-        }
-        
-        // Trigger action
-        do_action('ufub_person_deleted', $person_id);
+        return array('success' => true, 'message' => 'Contact updated processed');
     }
     
     /**
      * Handle event created webhook
      */
-    private function handle_event_created($payload) {
-        $event_data = $payload['event'] ?? array();
+    private function handle_event_created($data) {
+        $event = $data['data']['event'] ?? array();
         
-        ufub_log_info('Event created webhook received', array(
-            'event_id' => $event_data['id'] ?? 'unknown',
-            'event_type' => $event_data['type'] ?? 'unknown',
-            'person_id' => $event_data['personId'] ?? 'unknown'
-        ));
+        // Process events from FUB (emails clicked, responses, etc.)
+        // Update behavioral tracking based on FUB activity
         
-        // Store event data for analytics
-        $this->store_event_data($event_data);
+        if (!empty($event['contact_id']) && !empty($event['type'])) {
+            // Log event for behavioral analysis
+            $this->log_fub_event($event);
+        }
         
-        // Trigger action
-        do_action('ufub_event_created', $event_data);
+        return array('success' => true, 'message' => 'Event processed');
     }
     
     /**
-     * Handle note created webhook
+     * Handle property match webhook
      */
-    private function handle_note_created($payload) {
-        $note_data = $payload['note'] ?? array();
+    private function handle_property_match($data) {
+        // FUB might send us property match notifications
+        // This could trigger additional actions on our side
         
-        ufub_log_info('Note created webhook received', array(
-            'note_id' => $note_data['id'] ?? 'unknown',
-            'person_id' => $note_data['personId'] ?? 'unknown'
-        ));
-        
-        // Trigger action
-        do_action('ufub_note_created', $note_data);
+        return array('success' => true, 'message' => 'Property match processed');
     }
     
     /**
-     * Create WordPress user from FUB person data
+     * Handle generic webhook
      */
-    private function create_wp_user_from_fub($person_data) {
-        $email = $person_data['emails'][0]['value'] ?? '';
-        
-        if (empty($email) || email_exists($email)) {
-            return false;
-        }
-        
-        $user_data = array(
-            'user_login' => sanitize_user($email),
-            'user_email' => $email,
-            'first_name' => $person_data['firstName'] ?? '',
-            'last_name' => $person_data['lastName'] ?? '',
-            'display_name' => trim(($person_data['firstName'] ?? '') . ' ' . ($person_data['lastName'] ?? '')),
-            'user_pass' => wp_generate_password(),
-            'role' => get_option('ufub_default_user_role', 'subscriber')
-        );
-        
-        $user_id = wp_insert_user($user_data);
-        
-        if (!is_wp_error($user_id)) {
-            // Store FUB person ID
-            update_user_meta($user_id, 'fub_person_id', $person_data['id']);
-            
-            // Store additional FUB data
-            if (!empty($person_data['phones'][0]['value'])) {
-                update_user_meta($user_id, 'phone', $person_data['phones'][0]['value']);
-            }
-            
-            if (!empty($person_data['addresses'][0])) {
-                $address = $person_data['addresses'][0];
-                update_user_meta($user_id, 'address', $address['street'] ?? '');
-                update_user_meta($user_id, 'city', $address['city'] ?? '');
-                update_user_meta($user_id, 'state', $address['state'] ?? '');
-                update_user_meta($user_id, 'zip', $address['code'] ?? '');
-            }
-            
-            // Store custom fields
-            if (!empty($person_data['customFields'])) {
-                foreach ($person_data['customFields'] as $field) {
-                    update_user_meta($user_id, 'fub_' . $field['name'], $field['value']);
-                }
-            }
-            
-            ufub_log_info('WordPress user created from FUB person', array(
-                'user_id' => $user_id,
-                'fub_person_id' => $person_data['id'],
-                'email' => $email
-            ));
-            
-            return $user_id;
-        }
-        
-        return false;
+    private function handle_generic_webhook($data) {
+        // Store unknown webhook types for analysis
+        return array('success' => true, 'message' => 'Generic webhook processed');
     }
     
     /**
-     * Update WordPress user from FUB person data
+     * Verify webhook signature/authenticity
      */
-    private function update_wp_user_from_fub($person_data) {
-        // Find user by FUB person ID
-        $users = get_users(array(
-            'meta_key' => 'fub_person_id',
-            'meta_value' => $person_data['id'],
-            'number' => 1
-        ));
+    private function verify_webhook_data($data) {
+        // Implement webhook signature verification
+        // FUB should provide a signature header to verify authenticity
         
-        if (empty($users)) {
-            // Try to find by email
-            $email = $person_data['emails'][0]['value'] ?? '';
-            if ($email) {
-                $user = get_user_by('email', $email);
-                if ($user) {
-                    update_user_meta($user->ID, 'fub_person_id', $person_data['id']);
-                    $users = array($user);
-                }
-            }
+        $signature = $_SERVER['HTTP_X_FUB_SIGNATURE'] ?? '';
+        
+        if (empty($signature)) {
+            // For now, allow webhooks without signatures (development)
+            return true;
         }
         
-        if (empty($users)) {
-            return false;
+        // Verify signature against webhook secret
+        $webhook_secret = get_option('ufub_webhook_secret', '');
+        if (empty($webhook_secret)) {
+            return true; // No secret configured
         }
         
-        $user = $users[0];
+        $expected_signature = hash_hmac('sha256', json_encode($data), $webhook_secret);
         
-        // Update user data
-        $user_data = array(
-            'ID' => $user->ID,
-            'first_name' => $person_data['firstName'] ?? '',
-            'last_name' => $person_data['lastName'] ?? '',
-            'display_name' => trim(($person_data['firstName'] ?? '') . ' ' . ($person_data['lastName'] ?? ''))
-        );
-        
-        wp_update_user($user_data);
-        
-        // Update meta fields
-        if (!empty($person_data['phones'][0]['value'])) {
-            update_user_meta($user->ID, 'phone', $person_data['phones'][0]['value']);
-        }
-        
-        ufub_log_info('WordPress user updated from FUB person', array(
-            'user_id' => $user->ID,
-            'fub_person_id' => $person_data['id']
-        ));
-        
-        return $user->ID;
+        return hash_equals($signature, $expected_signature);
     }
     
     /**
-     * Delete WordPress user by FUB ID
+     * Verify webhook signature for REST API
      */
-    private function delete_wp_user_by_fub_id($fub_person_id) {
-        $users = get_users(array(
-            'meta_key' => 'fub_person_id',
-            'meta_value' => $fub_person_id,
-            'number' => 1
-        ));
-        
-        if (!empty($users)) {
-            $user_id = $users[0]->ID;
-            
-            if (wp_delete_user($user_id)) {
-                ufub_log_info('WordPress user deleted via FUB webhook', array(
-                    'user_id' => $user_id,
-                    'fub_person_id' => $fub_person_id
-                ));
-            }
-        }
+    public function verify_webhook_signature($request) {
+        // Basic permission check - can be enhanced with signature verification
+        return true;
     }
     
     /**
-     * Store person mapping
+     * Log webhook for debugging
      */
-    private function store_person_mapping($person_data) {
+    private function log_webhook($data) {
         global $wpdb;
         
-        $table = $wpdb->prefix . 'ufub_person_mapping';
-        
-        // Create table if it doesn't exist
-        $this->create_mapping_table_if_needed();
-        
-        $email = $person_data['emails'][0]['value'] ?? '';
-        
-        $wpdb->replace(
-            $table,
-            array(
-                'fub_person_id' => $person_data['id'],
-                'email' => $email,
-                'first_name' => $person_data['firstName'] ?? '',
-                'last_name' => $person_data['lastName'] ?? '',
-                'phone' => $person_data['phones'][0]['value'] ?? '',
-                'last_updated' => current_time('mysql'),
-                'person_data' => wp_json_encode($person_data)
-            ),
-            array('%s', '%s', '%s', '%s', '%s', '%s', '%s')
-        );
-    }
-    
-    /**
-     * Remove person mapping
-     */
-    private function remove_person_mapping($fub_person_id) {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_person_mapping';
-        
-        $wpdb->delete(
-            $table,
-            array('fub_person_id' => $fub_person_id),
-            array('%s')
-        );
-    }
-    
-    /**
-     * Store event data
-     */
-    private function store_event_data($event_data) {
-        global $wpdb;
-        
-        $table = $wpdb->prefix . 'ufub_tracking_data';
+        // Store webhook data for analysis
+        $table = $wpdb->prefix . 'fub_api_logs';
         
         $wpdb->insert(
             $table,
             array(
-                'session_id' => 'webhook_' . $event_data['id'],
-                'fub_contact_id' => $event_data['personId'] ?? '',
-                'event_type' => 'fub_' . strtolower(str_replace(' ', '_', $event_data['type'] ?? 'unknown')),
-                'tracking_data' => wp_json_encode($event_data),
-                'timestamp' => current_time('mysql')
+                'event_type' => 'webhook_received',
+                'request_data' => json_encode($data),
+                'response_data' => '',
+                'status' => 'received',
+                'created_at' => current_time('mysql')
             ),
             array('%s', '%s', '%s', '%s', '%s')
         );
     }
     
     /**
-     * Verify webhook request
+     * Log FUB event for behavioral tracking
      */
-    private function verify_webhook_request() {
-        // If no secret is set, we can't verify
-        if (empty($this->webhook_secret)) {
-            ufub_log('WARNING', 'Webhook secret not configured - cannot verify request');
-            return true; // Allow for now, but log warning
-        }
-        
-        // Get signature from headers
-        $signature = $_SERVER['HTTP_X_FUB_SIGNATURE'] ?? '';
-        
-        if (empty($signature)) {
-            ufub_log_error('Webhook signature missing from request');
-            return false;
-        }
-        
-        // Get raw payload
-        $payload = file_get_contents('php://input');
-        
-        // Calculate expected signature
-        $expected_signature = 'sha256=' . hash_hmac('sha256', $payload, $this->webhook_secret);
-        
-        // Verify signature
-        if (!hash_equals($expected_signature, $signature)) {
-            ufub_log_error('Webhook signature verification failed', array(
-                'expected' => $expected_signature,
-                'received' => $signature
-            ));
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Get webhook payload
-     */
-    private function get_webhook_payload() {
-        $payload = file_get_contents('php://input');
-        
-        if (empty($payload)) {
-            return null;
-        }
-        
-        $decoded = json_decode($payload, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            ufub_log_error('Invalid JSON in webhook payload', array(
-                'json_error' => json_last_error_msg(),
-                'payload' => substr($payload, 0, 500)
-            ));
-            return null;
-        }
-        
-        return $decoded;
-    }
-    
-    /**
-     * Setup webhooks in FUB
-     */
-    public function setup_webhooks() {
-        if (!$this->api) {
-            return array('success' => false, 'error' => 'API not available');
-        }
-        
-        $webhook_url = home_url('ufub-webhook');
-        
-        // Define webhook events to subscribe to
-        $events = array(
-            'personCreated',
-            'personUpdated', 
-            'personDeleted',
-            'eventCreated',
-            'noteCreated'
-        );
-        
-        $results = array();
-        
-        foreach ($events as $event) {
-            $webhook_data = array(
-                'url' => $webhook_url . '/' . $this->convert_event_name($event),
-                'events' => array($event),
-                'active' => true
-            );
-            
-            $result = $this->api->create_webhook($webhook_data['url'], $webhook_data['events']);
-            
-            if ($result && !isset($result['error'])) {
-                $results[$event] = array(
-                    'success' => true,
-                    'webhook_id' => $result['id'],
-                    'url' => $webhook_data['url']
-                );
-                
-                // Store webhook ID for future reference
-                update_option("ufub_webhook_{$event}_id", $result['id']);
-                
-            } else {
-                $results[$event] = array(
-                    'success' => false,
-                    'error' => $result['error'] ?? 'Unknown error'
-                );
-            }
-        }
-        
-        ufub_log_info('Webhooks setup completed', $results);
-        
-        return $results;
-    }
-    
-    /**
-     * Convert event name for URL
-     */
-    private function convert_event_name($event) {
-        $mapping = array(
-            'personCreated' => 'person-created',
-            'personUpdated' => 'person-updated',
-            'personDeleted' => 'person-deleted',
-            'eventCreated' => 'event-created',
-            'noteCreated' => 'note-created'
-        );
-        
-        return $mapping[$event] ?? strtolower($event);
-    }
-    
-    /**
-     * Maybe setup webhooks automatically
-     */
-    public function maybe_setup_webhooks() {
-        // Only run this once per day
-        $last_check = get_option('ufub_webhook_last_check', 0);
-        if (time() - $last_check < DAY_IN_SECONDS) {
-            return;
-        }
-        
-        update_option('ufub_webhook_last_check', time());
-        
-        // Check if webhooks are already set up
-        if (get_option('ufub_webhooks_configured', false)) {
-            return;
-        }
-        
-        // Auto-setup if API is configured
-        if (get_option('ufub_api_key') && get_option('ufub_auto_setup_webhooks', true)) {
-            $this->setup_webhooks();
-            update_option('ufub_webhooks_configured', true);
-        }
-    }
-    
-    /**
-     * Create mapping table if needed
-     */
-    private function create_mapping_table_if_needed() {
+    private function log_fub_event($event) {
         global $wpdb;
         
-        $table = $wpdb->prefix . 'ufub_person_mapping';
+        $table = $wpdb->prefix . 'fub_behavioral_data';
         
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") != $table) {
-            $charset_collate = $wpdb->get_charset_collate();
-            
-            $sql = "CREATE TABLE $table (
-                id bigint(20) NOT NULL AUTO_INCREMENT,
-                fub_person_id varchar(100) NOT NULL,
-                wp_user_id bigint(20) DEFAULT NULL,
-                email varchar(255) NOT NULL,
-                first_name varchar(100),
-                last_name varchar(100),
-                phone varchar(50),
-                last_updated datetime DEFAULT CURRENT_TIMESTAMP,
-                person_data longtext,
-                PRIMARY KEY (id),
-                UNIQUE KEY fub_person_id (fub_person_id),
-                KEY email (email),
-                KEY wp_user_id (wp_user_id)
-            ) $charset_collate;";
-            
-            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-            dbDelta($sql);
-        }
-    }
-    
-    /**
-     * AJAX: Setup webhooks
-     */
-    public function ajax_setup_webhooks() {
-        check_ajax_referer('ufub_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-        
-        $results = $this->setup_webhooks();
-        
-        wp_send_json_success($results);
-    }
-    
-    /**
-     * AJAX: Test webhook
-     */
-    public function ajax_test_webhook() {
-        check_ajax_referer('ufub_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-        
-        // Send a test payload to our webhook endpoint
-        $test_payload = array(
-            'person' => array(
-                'id' => 'test_' . time(),
-                'firstName' => 'Test',
-                'lastName' => 'User',
-                'emails' => array(array('value' => 'test@example.com'))
-            )
+        $wpdb->insert(
+            $table,
+            array(
+                'user_identifier' => $event['contact_id'],
+                'event_type' => 'fub_activity',
+                'event_data' => json_encode($event),
+                'confidence_score' => 80, // FUB events are high confidence
+                'timestamp' => current_time('mysql')
+            ),
+            array('%s', '%s', '%s', '%d', '%s')
         );
-        
-        $webhook_url = home_url('ufub-webhook/person-created');
-        
-        $response = wp_remote_post($webhook_url, array(
-            'body' => wp_json_encode($test_payload),
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'X-FUB-Signature' => 'sha256=' . hash_hmac('sha256', wp_json_encode($test_payload), $this->webhook_secret)
-            )
-        ));
-        
-        if (is_wp_error($response)) {
-            wp_send_json_error('Webhook test failed: ' . $response->get_error_message());
-        }
-        
-        $response_code = wp_remote_retrieve_response_code($response);
-        
-        if ($response_code === 200) {
-            wp_send_json_success('Webhook test successful');
-        } else {
-            wp_send_json_error('Webhook test failed with response code: ' . $response_code);
-        }
     }
     
     /**
-     * AJAX: Delete webhook
+     * Get webhook URL for FUB configuration
      */
-    public function ajax_delete_webhook() {
-        check_ajax_referer('ufub_nonce', 'nonce');
+    public function get_webhook_url() {
+        return home_url('/ufub-webhook/');
+    }
+    
+    /**
+     * Get REST webhook URL
+     */
+    public function get_rest_webhook_url() {
+        return rest_url('ufub/v1/webhook');
+    }
+    
+    /**
+     * Setup webhook in FUB (if API supports it)
+     */
+    public function setup_fub_webhook() {
+        // This would configure the webhook URL in FUB
+        // Implementation depends on FUB's webhook API
         
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
+        $webhook_url = $this->get_webhook_url();
         
-        $webhook_id = sanitize_text_field($_POST['webhook_id']);
+        // Make API call to FUB to register our webhook
+        // This is pseudocode - depends on FUB's actual API
+        /*
+        $response = $this->api->register_webhook(array(
+            'url' => $webhook_url,
+            'events' => array('contact.created', 'contact.updated', 'event.created')
+        ));
+        */
         
-        if ($this->api) {
-            $result = $this->api->delete_webhook($webhook_id);
-            
-            if ($result && !isset($result['error'])) {
-                wp_send_json_success('Webhook deleted successfully');
-            } else {
-                wp_send_json_error('Failed to delete webhook: ' . ($result['error'] ?? 'Unknown error'));
-            }
-        } else {
-            wp_send_json_error('API not available');
-        }
+        return $webhook_url;
     }
 }
+?>

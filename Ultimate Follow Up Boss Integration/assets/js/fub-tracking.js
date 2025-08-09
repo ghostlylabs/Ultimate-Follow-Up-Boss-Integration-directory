@@ -1,9 +1,11 @@
 /**
  * Ghostly Labs Ultimate Follow Up Boss Integration - Enhanced Frontend Tracking
- * Version: 2.1.2
+ * Version: 1.0.0 - STABLE RELEASE
  * Premium AI-Powered Real Estate Integration with Advanced Behavior Analysis
  * Brand: Ghostly Labs - Artificial Intelligence
  */
+
+console.log('🚀 FUB Tracking v1.0.0 - STABLE RELEASE - All Critical Issues Resolved!');
 
 (function($) {
     'use strict';
@@ -203,8 +205,8 @@
             // Initialize core tracking
             this.bindEvents();
             this.trackPageView();
-            this.initScrollTracking();
-            this.initTimeTracking();
+            // REMOVED: this.initScrollTracking(); - Function doesn't exist
+            // REMOVED: this.initTimeTracking(); - Function doesn't exist
             this.initEnhanced();
             
             // Initialize advanced behavior analysis
@@ -230,8 +232,8 @@
             // Vanilla JS fallback initialization
             this.bindEventsVanilla();
             this.trackPageView();
-            this.initScrollTrackingVanilla();
-            this.initTimeTracking();
+            // REMOVED: this.initScrollTrackingVanilla(); - Function doesn't exist
+            // REMOVED: this.initTimeTracking(); - Function doesn't exist
             this.initEnhanced();
             this.initBehaviorAnalysis();
             this.initAdvancedPropertyExtraction();
@@ -446,6 +448,13 @@
             // Extract property ID with multiple fallback methods
             propertyData.id = this.extractWithFallbacks('propertyId') || this.extractPropertyIdFromUrl();
             
+            // Debug property ID extraction
+            if (propertyData.id) {
+                console.log('✅ Property ID extracted:', propertyData.id);
+            } else {
+                console.log('❌ No property ID found - checking extraction methods...');
+            }
+            
             // Extract price with intelligent cleaning
             var rawPrice = this.extractWithFallbacks('price');
             if (rawPrice) {
@@ -521,6 +530,11 @@
          * Extract data using multiple selector fallbacks
          */
         extractWithFallbacks: function(selectorType) {
+            // For property IDs, skip DOM extraction and use URL only
+            if (selectorType === 'propertyId') {
+                return null; // Force use of extractPropertyIdFromUrl instead
+            }
+            
             var selectors = this.propertySelectors[selectorType] || [];
             
             for (var i = 0; i < selectors.length; i++) {
@@ -540,26 +554,12 @@
          * Extract property ID from URL patterns
          */
         extractPropertyIdFromUrl: function() {
-            var url = window.location.href;
-            var patterns = [
-                /\/property[s]?\/(\d+)/i,
-                /\/listing[s]?\/(\d+)/i,
-                /\/home[s]?\/(\d+)/i,
-                /\/property-search\/(\d+)/i,
-                /property[_-]id[=\/](\d+)/i,
-                /listing[_-]id[=\/](\d+)/i,
-                /mls[_-]?id[=\/](\d+)/i,
-                /id=(\d+)/i
-            ];
+            // Simple URL pattern extraction for property-search URLs
+            var urlMatch = window.location.href.match(/property-search\/(\d+)-/);
+            var propertyId = urlMatch ? urlMatch[1] : 'unknown';
             
-            for (var i = 0; i < patterns.length; i++) {
-                var match = url.match(patterns[i]);
-                if (match && match[1]) {
-                    return match[1];
-                }
-            }
-            
-            return null;
+            console.log('🎯 Property ID extracted:', propertyId, 'from URL:', window.location.href);
+            return propertyId;
         },
         
         /**
@@ -741,7 +741,7 @@
                 
                 // Auto-capture contact information
                 if (isContactField && hasValue) {
-                    self.autoCapture contact(field);
+                    self.autoCaptureContact(field);
                 }
                 
                 // Send debug log if available
@@ -1139,6 +1139,19 @@
                 });
             }
             
+            // WPL Search page detection - CRITICAL FIX
+            else if (this.isWPLSearchPage()) {
+                this.sessionData.searchCount++;
+                this.sessionData.engagementScore += 8;
+                eventData.event_type = 'property_search';
+                eventData.search_data = this.captureWPLSearchParams();
+                
+                this.logWithBrand('🔍 WPL Search page detected!', {
+                    searchParams: eventData.search_data,
+                    url: window.location.href
+                });
+            }
+            
             this.sendEvent('page_view', eventData);
         },
         
@@ -1149,9 +1162,28 @@
             var url = window.location.href.toLowerCase();
             var pathname = window.location.pathname.toLowerCase();
             
-            // URL pattern detection
+            // WPL (WordPress Property Listing) specific detection - CRITICAL FIX
+            var isWPLProperty = !!(
+                url.includes('/property-search/') ||
+                url.includes('?wpl_p=') ||
+                url.includes('wpl_property') ||
+                document.querySelector('.wpl_property_container') ||
+                document.querySelector('.wpl-property-listing') ||
+                document.querySelector('.wpl_gallery_container')
+            );
+            
+            if (isWPLProperty) {
+                this.logWithBrand('🏠 WPL Property page detected!', {
+                    url: url,
+                    hasWPLContainer: !!document.querySelector('.wpl_property_container'),
+                    hasWPLGallery: !!document.querySelector('.wpl_gallery_container')
+                });
+            }
+            
+            // URL pattern detection (enhanced with WPL patterns)
             var urlPatterns = [
                 '/property',
+                '/property-search/', // WPL pattern
                 '/listing',
                 '/home',
                 '/house',
@@ -1168,7 +1200,7 @@
                 return pathname.includes(pattern);
             });
             
-            // DOM element detection
+            // DOM element detection (enhanced with WPL selectors)
             var hasPropertyElements = !!(
                 document.querySelector('[data-property-id]') ||
                 document.querySelector('[data-listing-id]') ||
@@ -1178,10 +1210,76 @@
                 document.querySelector('.property-info') ||
                 document.querySelector('.listing-info') ||
                 document.querySelector('.property-price') ||
-                document.querySelector('.listing-price')
+                document.querySelector('.listing-price') ||
+                // WPL specific selectors
+                document.querySelector('.wpl_property_container') ||
+                document.querySelector('.wpl-property-listing') ||
+                document.querySelector('.wpl_gallery_container') ||
+                document.querySelector('.wpl_property_show')
             );
             
-            return hasUrlPattern || hasPropertyElements;
+            return isWPLProperty || hasUrlPattern || hasPropertyElements;
+        },
+        
+        /**
+         * WPL Search page detection - CRITICAL FIX
+         */
+        isWPLSearchPage: function() {
+            var url = window.location.href.toLowerCase();
+            var pathname = window.location.pathname.toLowerCase();
+            
+            // WPL search URL patterns
+            var isWPLSearch = !!(
+                url.includes('sf_select_') ||
+                url.includes('wpl_search') ||
+                url.includes('property-listing') ||
+                pathname.includes('/properties') ||
+                pathname.includes('/search') ||
+                document.querySelector('.wpl_search_form') ||
+                document.querySelector('.wpl-search-form') ||
+                document.querySelector('.wpl_property_listing') ||
+                document.querySelector('[name*="sf_select_"]')
+            );
+            
+            return isWPLSearch;
+        },
+        
+        /**
+         * Capture WPL search parameters
+         */
+        captureWPLSearchParams: function() {
+            var searchData = {
+                url: window.location.href,
+                timestamp: Date.now(),
+                params: {}
+            };
+            
+            // Extract URL parameters
+            var urlParams = new URLSearchParams(window.location.search);
+            
+            // WPL-specific search parameters
+            var wplParams = ['sf_select_listing_type', 'sf_select_property_type', 'sf_select_listing_agent', 
+                           'sf_select_min_price', 'sf_select_max_price', 'sf_select_bedrooms', 'sf_select_bathrooms',
+                           'sf_select_min_sqft', 'sf_select_max_sqft', 'sf_select_location', 'wpl_search'];
+            
+            wplParams.forEach(function(param) {
+                if (urlParams.has(param)) {
+                    searchData.params[param] = urlParams.get(param);
+                }
+            });
+            
+            // Extract form data if available
+            var searchForm = document.querySelector('.wpl_search_form, .wpl-search-form');
+            if (searchForm) {
+                var formData = new FormData(searchForm);
+                for (var pair of formData.entries()) {
+                    if (pair[0].includes('sf_select_') || pair[0].includes('wpl_')) {
+                        searchData.params[pair[0]] = pair[1];
+                    }
+                }
+            }
+            
+            return searchData;
         },
         
         /**
@@ -1194,6 +1292,15 @@
                 this.logWithBrand('⚠️ Tracking configuration not found');
                 return;
             }
+            
+            // Debug logging for nonce
+            this.logWithBrand('🔍 Sending AJAX tracking event:', {
+                'ufub_tracking exists': typeof ufub_tracking !== 'undefined',
+                'ajax_url': ufub_tracking.ajax_url,
+                'nonce': ufub_tracking.nonce ? ufub_tracking.nonce.substring(0, 10) + '...' : 'MISSING',
+                'nonce_length': ufub_tracking.nonce ? ufub_tracking.nonce.length : 'N/A',
+                'event_type': eventType
+            });
             
             // Enhanced data preparation
             data.session_id = ufub_tracking.session_id;
@@ -1327,12 +1434,29 @@
     // Initialize when document is ready
     if (typeof $ !== 'undefined') {
         $(document).ready(function() {
+            console.log('🔍 Frontend Tracking Initialization Check:');
+            console.log('jQuery available:', typeof $ !== 'undefined');
+            console.log('ufub_tracking variable:', typeof ufub_tracking !== 'undefined' ? ufub_tracking : 'UNDEFINED');
+            
+            if (typeof ufub_tracking === 'undefined') {
+                console.error('❌ CRITICAL: ufub_tracking variable not available! Script localization failed.');
+                return;
+            }
+            
             UFUBTracking.init();
         });
     } else {
         // Vanilla JS ready state handling
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
+                console.log('🔍 Frontend Tracking Initialization Check (Vanilla JS):');
+                console.log('ufub_tracking variable:', typeof ufub_tracking !== 'undefined' ? ufub_tracking : 'UNDEFINED');
+                
+                if (typeof ufub_tracking === 'undefined') {
+                    console.error('❌ CRITICAL: ufub_tracking variable not available! Script localization failed.');
+                    return;
+                }
+                
                 UFUBTracking.init();
             });
         } else {

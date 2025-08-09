@@ -1,0 +1,563 @@
+/* Ghostly Labs Ultimate Follow Up Boss Integration - Property Matching Styles
+ * Version: 1.0.0
+ * Premium AI-Powered Real Estate Integration - Property Matching Interface
+ * Brand: Ghostly Labs - Artificial Intelligence
+ */
+
+/* Property Matching Container */
+.ufub-property-matching-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 30px;
+}
+
+/* Property Matching Header */
+.ufub-property-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-bottom: 30px;
+    border-bottom: 2px solid rgba(58, 178, 74, 0.2);
+}
+
+.ufub-property-title {
+    font-size: 2.2em;
+    color: #ffffff;
+    margin-bottom: 15px;
+    font-weight: 300;
+    background: linear-gradient(45deg, #3ab24a, #2ea040);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.ufub-property-subtitle {
+    color: #b0b0b0;
+    font-size: 1em;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+/* Search and Filter Bar */
+.ufub-search-bar {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 20px;
+    border-radius: 16px;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(58, 178, 74, 0.15);
+}
+
+.ufub-search-input {
+    flex: 1;
+    padding: 15px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.ufub-search-input:focus {
+    outline: none;
+    border-color: #3ab24a;
+    box-shadow: 0 0 20px rgba(58, 178, 74, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.ufub-search-input::placeholder {
+    color: #888888;
+}
+
+.ufub-filter-select {
+    min-width: 180px;
+    padding: 15px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 14px;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233ab24a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 16px;
+    padding-right: 45px;
+    transition: all 0.3s ease;
+}
+
+.ufub-filter-select:focus {
+    outline: none;
+    border-color: #3ab24a;
+    box-shadow: 0 0 20px rgba(58, 178, 74, 0.3);
+}
+
+.ufub-search-btn {
+    padding: 15px 25px;
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 14px;
+}
+
+.ufub-search-btn:hover {
+    background: linear-gradient(135deg, #2ea040, #259a36);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(58, 178, 74, 0.4);
+}
+
+/* Property Grid */
+.ufub-property-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    margin-bottom: 40px;
+}
+
+/* Property Card */
+.ufub-property-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 20px;
+    overflow: hidden;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(58, 178, 74, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.ufub-property-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    border-color: rgba(58, 178, 74, 0.4);
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(58, 178, 74, 0.3);
+}
+
+/* Property Image */
+.ufub-property-image {
+    position: relative;
+    height: 200px;
+    background: linear-gradient(135deg, #2d2d2d, #1a1a1a);
+    overflow: hidden;
+}
+
+.ufub-property-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: all 0.3s ease;
+}
+
+.ufub-property-card:hover .ufub-property-image img {
+    transform: scale(1.1);
+}
+
+.ufub-property-status {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(10px);
+}
+
+.ufub-property-status.available {
+    background: rgba(58, 178, 74, 0.2);
+    color: #3ab24a;
+    border: 1px solid rgba(58, 178, 74, 0.3);
+}
+
+.ufub-property-status.sold {
+    background: rgba(220, 53, 69, 0.2);
+    color: #dc3545;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.ufub-property-status.pending {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.ufub-property-price {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #3ab24a;
+    padding: 8px 15px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1.1em;
+    backdrop-filter: blur(10px);
+}
+
+/* Property Content */
+.ufub-property-content {
+    padding: 25px;
+}
+
+.ufub-property-title {
+    color: #ffffff;
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ufub-property-address {
+    color: #b0b0b0;
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ufub-property-address .dashicons {
+    color: #3ab24a;
+    font-size: 16px;
+}
+
+/* Property Details */
+.ufub-property-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.ufub-detail-item {
+    text-align: center;
+    padding: 12px 8px;
+    background: rgba(58, 178, 74, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(58, 178, 74, 0.1);
+}
+
+.ufub-detail-value {
+    color: #3ab24a;
+    font-weight: 700;
+    font-size: 1.1em;
+    margin-bottom: 5px;
+}
+
+.ufub-detail-label {
+    color: #b0b0b0;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Property Actions */
+.ufub-property-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.ufub-property-btn {
+    flex: 1;
+    padding: 12px 15px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    text-decoration: none;
+    text-align: center;
+}
+
+.ufub-property-btn.primary {
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+}
+
+.ufub-property-btn.primary:hover {
+    background: linear-gradient(135deg, #2ea040, #259a36);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(58, 178, 74, 0.3);
+}
+
+.ufub-property-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border: 1px solid rgba(58, 178, 74, 0.3);
+}
+
+.ufub-property-btn.secondary:hover {
+    background: rgba(58, 178, 74, 0.1);
+    border-color: rgba(58, 178, 74, 0.5);
+}
+
+/* Matching Configuration Panel */
+.ufub-matching-config {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 30px;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(58, 178, 74, 0.15);
+}
+
+.ufub-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: between;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(58, 178, 74, 0.2);
+}
+
+.ufub-config-title {
+    color: #ffffff;
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ufub-config-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.ufub-config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+}
+
+.ufub-config-section {
+    background: rgba(58, 178, 74, 0.05);
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid rgba(58, 178, 74, 0.1);
+}
+
+.ufub-config-label {
+    color: #ffffff;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.ufub-config-input {
+    width: 100%;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.ufub-config-input:focus {
+    outline: none;
+    border-color: #3ab24a;
+    box-shadow: 0 0 15px rgba(58, 178, 74, 0.3);
+}
+
+/* Pagination */
+.ufub-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 40px;
+}
+
+.ufub-page-btn {
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    border-radius: 8px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.ufub-page-btn:hover {
+    background: rgba(58, 178, 74, 0.1);
+    border-color: rgba(58, 178, 74, 0.5);
+}
+
+.ufub-page-btn.active {
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    border-color: #3ab24a;
+    color: white;
+}
+
+.ufub-page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ufub-page-info {
+    color: #b0b0b0;
+    margin: 0 15px;
+    font-size: 0.9em;
+}
+
+/* Empty State */
+.ufub-empty-properties {
+    text-align: center;
+    padding: 80px 20px;
+    color: #b0b0b0;
+}
+
+.ufub-empty-icon {
+    font-size: 5em;
+    margin-bottom: 25px;
+    opacity: 0.5;
+}
+
+.ufub-empty-title {
+    font-size: 1.6em;
+    margin-bottom: 15px;
+    color: #ffffff;
+}
+
+.ufub-empty-description {
+    font-size: 1em;
+    line-height: 1.5;
+    max-width: 400px;
+    margin: 0 auto 30px;
+}
+
+.ufub-empty-action {
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.ufub-empty-action:hover {
+    background: linear-gradient(135deg, #2ea040, #259a36);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(58, 178, 74, 0.4);
+}
+
+/* Loading State */
+.ufub-property-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.ufub-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(58, 178, 74, 0.3);
+    border-radius: 50%;
+    border-top-color: #3ab24a;
+    animation: propertySpinner 1s linear infinite;
+}
+
+@keyframes propertySpinner {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .ufub-property-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .ufub-config-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .ufub-property-matching-container {
+        padding: 20px;
+    }
+    
+    .ufub-search-bar {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .ufub-property-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .ufub-property-details {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .ufub-property-actions {
+        flex-direction: column;
+    }
+    
+    .ufub-pagination {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .ufub-property-title {
+        font-size: 2em;
+    }
+    
+    .ufub-property-content {
+        padding: 20px;
+    }
+    
+    .ufub-property-details {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .ufub-detail-item {
+        padding: 10px;
+    }
+    
+    .ufub-config-grid {
+        gap: 20px;
+    }
+    
+    .ufub-config-section {
+        padding: 15px;
+    }
+}

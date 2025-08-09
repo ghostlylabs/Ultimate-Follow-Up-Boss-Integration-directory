@@ -1,0 +1,512 @@
+/* Ghostly Labs Ultimate Follow Up Boss Integration - Debug Panel Styles
+ * Version: 2.1.2
+ * Premium AI-Powered Real Estate Integration - Advanced Debug Interface
+ * Brand: Ghostly Labs - Artificial Intelligence
+ */
+
+/* Debug Panel Container */
+.ufub-debug-panel {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    width: 600px;
+    max-height: 80vh;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    border: 1px solid rgba(58, 178, 74, 0.3);
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.8),
+        0 0 60px rgba(58, 178, 74, 0.2);
+    z-index: 999999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #ffffff;
+    display: none;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.ufub-debug-panel.minimized {
+    height: 50px;
+    overflow: hidden;
+}
+
+.ufub-debug-panel.minimized .ufub-debug-content {
+    display: none;
+}
+
+/* Debug Panel Header */
+.ufub-debug-header {
+    background: linear-gradient(135deg, #3ab24a, #2ea040);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move;
+    user-select: none;
+    border-radius: 16px 16px 0 0;
+}
+
+.ufub-debug-title {
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ufub-debug-icon {
+    font-size: 16px;
+}
+
+.ufub-debug-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.ufub-debug-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.ufub-debug-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+/* Debug Panel Content */
+.ufub-debug-content {
+    padding: 0;
+    height: calc(80vh - 50px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Debug Tabs */
+.ufub-debug-tabs {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(58, 178, 74, 0.2);
+    overflow-x: auto;
+}
+
+.ufub-debug-tab {
+    background: transparent;
+    border: none;
+    color: #b0b0b0;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+}
+
+.ufub-debug-tab:hover {
+    color: #ffffff;
+    background: rgba(58, 178, 74, 0.1);
+}
+
+.ufub-debug-tab.active {
+    color: #3ab24a;
+    background: rgba(58, 178, 74, 0.15);
+    border-bottom-color: #3ab24a;
+}
+
+/* Debug Filters */
+.ufub-debug-filters {
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(58, 178, 74, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    font-size: 12px;
+}
+
+.ufub-debug-filters label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.ufub-debug-filters input[type="checkbox"] {
+    accent-color: #3ab24a;
+    transform: scale(0.9);
+}
+
+.ufub-debug-clear {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    margin-left: auto;
+}
+
+.ufub-debug-clear:hover {
+    background: linear-gradient(135deg, #c82333, #a71e2a);
+    transform: translateY(-1px);
+}
+
+/* Debug Panel Content Areas */
+.ufub-debug-panels {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.ufub-debug-panel-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    padding: 15px;
+    display: none;
+}
+
+.ufub-debug-panel-content.active {
+    display: block;
+}
+
+/* Debug Logs */
+.ufub-debug-logs {
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+.ufub-log-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.ufub-log-entry:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ufub-log-entry.ufub-log-error {
+    background: rgba(220, 53, 69, 0.1);
+    border-left-color: #dc3545;
+}
+
+.ufub-log-entry.ufub-log-warn {
+    background: rgba(255, 193, 7, 0.1);
+    border-left-color: #ffc107;
+}
+
+.ufub-log-entry.ufub-log-success {
+    background: rgba(58, 178, 74, 0.1);
+    border-left-color: #3ab24a;
+}
+
+.ufub-log-entry.ufub-log-info {
+    background: rgba(58, 178, 74, 0.05);
+    border-left-color: rgba(58, 178, 74, 0.3);
+}
+
+.ufub-log-time {
+    color: #888888;
+    font-size: 10px;
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
+.ufub-log-type {
+    color: #3ab24a;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 50px;
+    flex-shrink: 0;
+}
+
+.ufub-log-category {
+    color: #b0b0b0;
+    min-width: 80px;
+    flex-shrink: 0;
+}
+
+.ufub-log-message {
+    color: #ffffff;
+    flex: 1;
+    word-break: break-word;
+}
+
+/* Performance Stats */
+.ufub-performance-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.ufub-stat-item {
+    background: rgba(58, 178, 74, 0.05);
+    border: 1px solid rgba(58, 178, 74, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+
+.ufub-stat-item label {
+    display: block;
+    color: #b0b0b0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.ufub-stat-item span {
+    color: #3ab24a;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+/* Performance Chart */
+.ufub-performance-chart {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+}
+
+#ufub-performance-canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* API Calls */
+.ufub-api-calls {
+    font-size: 12px;
+}
+
+.ufub-api-call {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-left: 3px solid #3ab24a;
+}
+
+.ufub-api-call-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.ufub-api-method {
+    background: #3ab24a;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.ufub-api-url {
+    color: #ffffff;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    flex: 1;
+    word-break: break-all;
+}
+
+.ufub-api-time {
+    color: #888888;
+    font-size: 10px;
+}
+
+.ufub-api-call-details {
+    color: #b0b0b0;
+    font-size: 11px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+/* System Information */
+.ufub-system-info {
+    font-size: 12px;
+}
+
+.ufub-system-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(58, 178, 74, 0.1);
+}
+
+.ufub-system-item:last-child {
+    border-bottom: none;
+}
+
+.ufub-system-item label {
+    color: #b0b0b0;
+    font-weight: 600;
+    min-width: 150px;
+}
+
+.ufub-system-item span {
+    color: #ffffff;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 11px;
+    word-break: break-all;
+    text-align: right;
+    flex: 1;
+    margin-left: 10px;
+}
+
+/* Scrollbar Styling */
+.ufub-debug-logs::-webkit-scrollbar,
+.ufub-debug-panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ufub-debug-logs::-webkit-scrollbar-track,
+.ufub-debug-panel-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.ufub-debug-logs::-webkit-scrollbar-thumb,
+.ufub-debug-panel-content::-webkit-scrollbar-thumb {
+    background: rgba(58, 178, 74, 0.5);
+    border-radius: 3px;
+}
+
+.ufub-debug-logs::-webkit-scrollbar-thumb:hover,
+.ufub-debug-panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(58, 178, 74, 0.7);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .ufub-debug-panel {
+        width: calc(100vw - 40px);
+        right: 20px;
+        left: 20px;
+        max-height: 70vh;
+    }
+    
+    .ufub-performance-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .ufub-debug-filters {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .ufub-debug-clear {
+        margin-left: 0;
+        align-self: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .ufub-debug-panel {
+        width: calc(100vw - 20px);
+        right: 10px;
+        left: 10px;
+        top: 10px;
+        max-height: calc(100vh - 20px);
+    }
+    
+    .ufub-debug-tabs {
+        flex-direction: column;
+    }
+    
+    .ufub-debug-tab {
+        text-align: left;
+        border-bottom: 1px solid rgba(58, 178, 74, 0.1);
+        border-right: none;
+    }
+    
+    .ufub-debug-tab.active {
+        border-right: none;
+        border-left: 3px solid #3ab24a;
+    }
+}
+
+/* Animation for debug panel appearance */
+@keyframes debugPanelSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.ufub-debug-panel {
+    animation: debugPanelSlideIn 0.3s ease-out;
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+    .ufub-debug-panel {
+        background: rgba(0, 0, 0, 0.98);
+        border-color: rgba(58, 178, 74, 0.4);
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .ufub-debug-panel {
+        border: 2px solid #3ab24a;
+    }
+    
+    .ufub-log-entry {
+        border-left-width: 4px;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .ufub-debug-panel,
+    .ufub-debug-btn,
+    .ufub-debug-tab,
+    .ufub-log-entry {
+        transition: none;
+        animation: none;
+    }
+}

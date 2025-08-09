@@ -34,6 +34,14 @@
         init: function() {
             this.logWithBrand('🚀 Initializing Ghostly Labs Admin Interface...');
             
+            // Debug ufub_admin variable
+            console.log('🔍 UFUB Admin Variable Check:', {
+                'ufub_admin exists': typeof ufub_admin !== 'undefined',
+                'ajax_url': typeof ufub_admin !== 'undefined' ? ufub_admin.ajax_url : 'UNDEFINED',
+                'nonce': typeof ufub_admin !== 'undefined' ? ufub_admin.nonce : 'UNDEFINED',
+                'nonce length': typeof ufub_admin !== 'undefined' ? ufub_admin.nonce.length : 'N/A'
+            });
+            
             // Initialize core functionality
             this.bindEvents();
             this.initTooltips();
@@ -328,6 +336,39 @@
         },
         
         /**
+         * Initialize tooltips for enhanced user experience
+         */
+        initTooltips: function() {
+            // Initialize tooltips for elements with data-tooltip attribute
+            $('[data-tooltip]').each(function() {
+                var $element = $(this);
+                var tooltipText = $element.attr('data-tooltip');
+                
+                if (tooltipText) {
+                    $element.attr('title', tooltipText);
+                }
+            });
+            
+            // Enhanced tooltips for help icons
+            $('.help-icon, .info-icon, [data-help]').each(function() {
+                var $element = $(this);
+                var helpText = $element.attr('data-help') || $element.attr('title');
+                
+                if (helpText) {
+                    $element.css('cursor', 'help');
+                }
+            });
+            
+            // Initialize any third-party tooltip libraries if available
+            if (typeof $.fn.tooltip === 'function') {
+                $('[data-tooltip], .help-icon, .info-icon').tooltip({
+                    placement: 'top',
+                    trigger: 'hover'
+                });
+            }
+        },
+        
+        /**
          * Enhanced API connection testing with detailed feedback
          */
         testApiConnection: function(e) {
@@ -352,11 +393,17 @@
             
             var self = this;
             
+            // Debug logging
+            console.log('🔍 Test Connection Debug:');
+            console.log('Sending nonce:', ufub_admin.nonce);
+            console.log('Ajax URL:', ufub_admin.ajax_url);
+            console.log('API Key (first 10 chars):', apiKey.substring(0, 10) + '...');
+            
             $.ajax({
                 url: ufub_admin.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'ufub_test_connection',
+                    action: 'ufub_test_api',
                     api_key: apiKey,
                     nonce: ufub_admin.nonce
                 },
@@ -488,3 +535,48 @@
                     });
                 },
                 complete: function() {
+                    $button.prop('disabled', false).html('Save Settings');
+                    self.hideLoading();
+                }
+            });
+        },
+        
+        /**
+         * Show admin notice
+         */
+        showNotice: function(message, type) {
+            type = type || 'info';
+            console.log('UFUB Admin Notice (' + type + '):', message);
+        },
+        
+        /**
+         * Update connection status
+         */
+        updateConnectionStatus: function(status) {
+            this.state.connectionStatus = status;
+            console.log('UFUB Connection Status:', status);
+        },
+        
+        /**
+         * Load dashboard data
+         */
+        loadDashboardData: function(silent) {
+            if (!silent) {
+                this.logWithBrand('📊 Loading dashboard data...');
+            }
+        },
+        
+        /**
+         * Validate settings form
+         */
+        validateSettings: function($form) {
+            return true; // Placeholder validation
+        }
+    };
+    
+    // Initialize when document is ready
+    $(document).ready(function() {
+        UFUBAdmin.init();
+    });
+    
+})(jQuery);
